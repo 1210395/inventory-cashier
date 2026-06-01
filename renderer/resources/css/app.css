@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 dark:bg-charcoal-700 dark:text-gray-100 transition-colors duration-200;
+  }
+}
+
+/* ===== Cashier touch optimizations (1366x768, finger-friendly) ===== */
+:root { --cashier-tap: 48px; }
+button, .btn, [role="button"], select, input[type="text"], input[type="number"],
+input[type="email"], input[type="password"], input[type="date"], input[type="search"], textarea {
+  min-height: var(--cashier-tap);
+  font-size: 16px;
+}
+/* Bigger, easier nav targets */
+nav a, aside a, .sidebar a { min-height: 46px; display: flex; align-items: center; }
+/* Larger table rows for touch */
+table td, table th { padding-top: 10px; padding-bottom: 10px; }
+/* Prevent text selection getting in the way of taps */
+nav, aside, button { -webkit-user-select: none; user-select: none; }
+/* Roomier tap area for icon buttons */
+button svg { pointer-events: none; }

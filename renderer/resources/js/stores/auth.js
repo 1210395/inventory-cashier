@@ -1,0 +1,59 @@
+import { defineStore } from 'pinia';
+import api, { setToken, clearToken, getToken } from '../composables/useApi.js';
+
+export const useAuthStore = defineStore('auth', {
+  state: () => ({
+    user: JSON.parse(localStorage.getItem('auth_user') || 'null'),
+    loading: false,
+  }),
+
+  getters: {
+    isAuthenticated: (state) => !!state.user && !!getToken(),
+  },
+
+  actions: {
+    async login(email, password) {
+      this.loading = true;
+      try {
+        const response = await api.post('/login', {
+          email,
+          password,
+          device_name: 'web_app',
+        });
+        this.user = response.data.user;
+        setToken(response.data.token);
+        localStorage.setItem('auth_user', JSON.stringify(response.data.user));
+        return response;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async logout() {
+      try {
+        await api.post('/logout');
+      } catch {
+        // Ignore errors on logout
+      } finally {
+        this.user = null;
+        clearToken();
+        window.location.href = '/login';
+      }
+    },
+
+    async fetchUser() {
+      if (!getToken()) {
+        this.user = null;
+        return;
+      }
+      try {
+        const response = await api.get('/user');
+        this.user = response.data;
+        localStorage.setItem('auth_user', JSON.stringify(response.data));
+      } catch {
+        this.user = null;
+        clearToken();
+      }
+    },
+  },
+});

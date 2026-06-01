@@ -1,0 +1,48 @@
+{
+  "name": "hisab-cashier",
+  "version": "1.0.0",
+  "description": "Hisab Cashier - Touchscreen kiosk shell for the Hisab web app (on-screen keyboard, ESC/POS cash drawer)",
+  "author": "Olive Dev",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build:renderer": "cd renderer && npm run build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build": "npm run build:renderer && npm run build:main",
+    "start": "npm run build:main && electron dist/main/main.js",
+    "package": "npm run build && electron-builder --win"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^25.0.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^20.0.0"
+  },
+  "build": {
+    "appId": "com.olivedev.hisabcashier",
+    "productName": "Hisab Cashier",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
+    }
+  }
+}

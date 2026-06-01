@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Cashier Settings</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #1f2937; color: #e5e7eb; }
+    h2 { margin: 0 0 16px; font-size: 18px; }
+    label { display: block; margin: 14px 0 4px; font-size: 13px; color: #9ca3af; }
+    select, input[type=text] { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #374151; background: #111827; color: #fff; font-size: 14px; }
+    .row { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+    .btns { display: flex; gap: 8px; margin-top: 24px; }
+    button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .primary { background: #D4A843; color: #1a1a1a; }
+    .secondary { background: #374151; color: #e5e7eb; }
+    .test { background: #2ECC71; color: #fff; }
+    .msg { margin-top: 10px; font-size: 13px; min-height: 18px; }
+  </style>
+</head>
+<body>
+  <h2>Cashier Settings</h2>
+
+  <label>Receipt printer (for cash drawer & ESC/POS)</label>
+  <select id="printer"></select>
+
+  <div class="row">
+    <input type="checkbox" id="autoDrawer" />
+    <label for="autoDrawer" style="margin:0;">Open cash drawer automatically on cash sales</label>
+  </div>
+
+  <div class="btns">
+    <button class="test" id="test">Test Drawer</button>
+  </div>
+  <div class="btns">
+    <button class="secondary" id="cancel">Close</button>
+    <button class="primary" id="save">Save</button>
+  </div>
+  <div class="msg" id="msg"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    async function load() {
+      const printers = await window.cashier.listPrinters();
+      const cfg = await window.cashier.getSettings();
+      const sel = $('printer');
+      sel.innerHTML = '<option value="">— Select printer —</option>' +
+        printers.map(p => `<option value="${p.name}">${p.displayName || p.name}${p.isDefault ? ' (default)' : ''}</option>`).join('');
+      sel.value = cfg.receiptPrinter || '';
+      $('autoDrawer').checked = !!cfg.openDrawerOnSale;
+    }
+    $('save').onclick = async () => {
+      await window.cashier.saveSettings({ receiptPrinter: $('printer').value, openDrawerOnSale: $('autoDrawer').checked });
+      $('msg').textContent = 'Saved.';
+      setTimeout(() => window.cashier.closeSettings(), 500);
+    };
+    $('cancel').onclick = () => window.cashier.closeSettings();
+    $('test').onclick = async () => {
+      await window.cashier.saveSettings({ receiptPrinter: $('printer').value });
+      const r = await window.cashier.openDrawer();
+      $('msg').textContent = r && r.success ? 'Drawer kicked.' : ('Failed: ' + (r && r.error || 'unknown'));
+    };
+    load();
+  </script>
+</body>
+</html>
