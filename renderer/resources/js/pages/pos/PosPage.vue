@@ -293,7 +293,7 @@
                 <span class="text-gray-900 dark:text-white font-medium">{{ formatCurrency(taxAmount) }}</span>
               </div>
 
-              <div class="flex justify-between text-lg font-bold pt-3 border-t border-gray-200 dark:border-gray-700">
+              <div class="flex justify-between items-center text-2xl font-extrabold pt-3 border-t border-gray-200 dark:border-gray-700">
                 <span class="text-gray-900 dark:text-white">{{ t('total') }}</span>
                 <span class="text-[#D4A843]">{{ formatCurrency(cartTotal) }}</span>
               </div>
@@ -344,12 +344,12 @@
             <AppButton
               variant="primary"
               size="lg"
-              class="w-full mt-6 !bg-green-600 hover:!bg-green-700 !text-white"
+              class="w-full mt-6 !bg-green-600 hover:!bg-green-700 !text-white !min-h-[68px] !text-lg !font-bold"
               :loading="completing"
               :disabled="cart.length === 0"
               @click="completeSale"
             >
-              {{ t('complete_sale') }}
+              {{ t('complete_sale') }}<span v-if="cart.length"> · {{ formatCurrency(cartTotal) }}</span>
             </AppButton>
           </div>
         </div>

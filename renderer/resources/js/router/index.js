@@ -53,8 +53,10 @@ const routes = [
     meta: { requiresAuth: false },
   },
   {
+    // Cashier lands on the POS (the shift guard sends them to open a shift first
+    // if none is open) — the natural till workflow.
     path: '/',
-    redirect: '/dashboard',
+    redirect: '/pos',
   },
   {
     path: '/dashboard',
@@ -280,9 +282,10 @@ router.beforeEach(async (to, from, next) => {
     }
   }
 
-  // If logged in and going to login page, redirect to dashboard
+  // If logged in and going to login page, send to the POS (shift guard handles
+  // the "open a shift first" step).
   if (to.name === 'Login' && auth.isAuthenticated) {
-    return next({ name: 'Dashboard' });
+    return next({ path: '/pos' });
   }
 
   // The POS (till) cannot be opened without an active cash-register shift.

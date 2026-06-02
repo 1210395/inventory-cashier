@@ -13,60 +13,40 @@
 
     <!-- Navigation -->
     <nav class="flex-1 py-4 space-y-1 overflow-y-auto">
-      <!-- Main -->
+      <!-- Sales (the cashier's daily tools) -->
       <div v-show="sidebarOpen" class="px-4 mb-1">
-        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">{{ t('dashboard') }}</span>
+        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">{{ t('sales') }}</span>
       </div>
-      <NavItem to="/dashboard" icon="&#x1F4CA;" :label="t('dashboard')" />
       <NavItem to="/pos" icon="&#x1F6D2;" :label="t('pos')" />
       <NavItem to="/reports/cash-shifts" icon="&#x1F4B5;" :label="t('cash_register') || t('cash_shifts')" />
       <NavItem to="/tables" icon="&#x1F37D;&#xFE0F;" :label="t('tables') || 'Tables'" />
+      <NavItem to="/invoices" icon="&#x1F9FE;" :label="t('invoices')" />
+      <NavItem to="/customers" icon="&#x1F465;" :label="t('customers')" />
+      <NavItem to="/returns" icon="&#x1F504;" :label="t('returns')" />
 
-      <!-- Inventory -->
+      <!-- Catalog -->
       <div v-show="sidebarOpen" class="px-4 mt-4 mb-1">
-        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Inventory</span>
+        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">{{ t('catalog') }}</span>
       </div>
       <NavItem to="/products" icon="&#x1F4E6;" :label="t('products')" />
       <NavItem to="/categories" icon="&#x1F3F7;&#xFE0F;" :label="t('categories')" />
       <NavItem to="/recipes" icon="&#x1F372;" :label="t('recipes')" />
 
-      <!-- People -->
+      <!-- Back office -->
       <div v-show="sidebarOpen" class="px-4 mt-4 mb-1">
-        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">People</span>
+        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">{{ t('back_office') }}</span>
       </div>
-      <NavItem to="/customers" icon="&#x1F465;" :label="t('customers')" />
+      <NavItem to="/dashboard" icon="&#x1F4CA;" :label="t('dashboard')" />
+      <NavItem to="/reports" icon="&#x1F4C8;" :label="t('reports')" />
+      <NavItem to="/stock" icon="&#x1F4E5;" :label="t('stock')" />
       <NavItem to="/suppliers" icon="&#x1F69A;" :label="t('suppliers')" />
-
-      <!-- Finance -->
-      <div v-show="sidebarOpen" class="px-4 mt-4 mb-1">
-        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Finance</span>
-      </div>
-      <NavItem to="/invoices" icon="&#x1F9FE;" :label="t('invoices')" />
       <NavItem to="/cheques" icon="&#x1F4B3;" :label="t('cheques')" />
       <NavItem to="/expenses" icon="&#x1F4B8;" :label="t('expenses')" />
-
-      <!-- Operations -->
-      <div v-show="sidebarOpen" class="px-4 mt-4 mb-1">
-        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Operations</span>
-      </div>
-      <NavItem to="/stock" icon="&#x1F4E5;" :label="t('stock')" />
-      <NavItem to="/returns" icon="&#x1F504;" :label="t('returns')" />
-
-      <!-- Analysis -->
-      <div v-show="sidebarOpen" class="px-4 mt-4 mb-1">
-        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Analysis</span>
-      </div>
-      <NavItem to="/reports" icon="&#x1F4C8;" :label="t('reports')" />
-
-      <!-- Tools -->
-      <div v-show="sidebarOpen" class="px-4 mt-4 mb-1">
-        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">{{ t('tools') || 'Tools' }}</span>
-      </div>
-      <NavItem to="/import" icon="&#x1F4E5;" :label="t('import_data')" />
+      <NavItem to="/import" icon="&#x1F4C4;" :label="t('import_data')" />
 
       <!-- System -->
       <div v-show="sidebarOpen" class="px-4 mt-4 mb-1">
-        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">System</span>
+        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">{{ t('settings') }}</span>
       </div>
       <NavItem to="/settings" icon="&#x2699;&#xFE0F;" :label="t('settings')" />
 
