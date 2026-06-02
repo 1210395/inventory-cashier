@@ -482,16 +482,19 @@ const currentCategories = computed(() => {
 });
 // All descendants of a category (so a parent shows everything beneath it).
 function descendantUuids(uuid) {
-  const out = [uuid];
+  const seen = new Set([uuid]);
   let frontier = [uuid];
   while (frontier.length) {
     const next = [];
     for (const c of posCategories.value) {
-      if (frontier.includes(c.parent_uuid)) { out.push(c.uuid); next.push(c.uuid); }
+      if (c.parent_uuid && frontier.includes(c.parent_uuid) && !seen.has(c.uuid)) {
+        seen.add(c.uuid);
+        next.push(c.uuid);
+      }
     }
     frontier = next;
   }
-  return out;
+  return [...seen];
 }
 function effectiveCategoryUuids() {
   return selectedCategoryUuid.value ? descendantUuids(selectedCategoryUuid.value) : [];
@@ -693,7 +696,7 @@ function addToCart(product) {
   } else {
     cart.value.push({
       product_uuid: product.uuid,
-      product_name: product.name_en || product.name,
+      product_name: catName(product) || product.name_en || product.name,
       sku: product.sku || '',
       unit_price: parseFloat(product.sell_price) || 0,
       quantity: 1,
@@ -703,9 +706,14 @@ function addToCart(product) {
     });
   }
 
-  productSearch.value = '';
-  searchResults.value = [];
+  // Keep the category product grid populated so the cashier can tap several
+  // items in a row; only the typed-search box/dropdown is reset after a pick.
   showResults.value = false;
+  if (productSearch.value) {
+    productSearch.value = '';
+    if (selectedCategoryUuid.value) triggerSearch();
+    else searchResults.value = [];
+  }
 }
 
 function removeFromCart(idx) {
