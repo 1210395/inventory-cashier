@@ -8,18 +8,92 @@
   }
 }
 
-/* ===== Cashier touch optimizations (1366x768, finger-friendly) ===== */
-:root { --cashier-tap: 48px; }
-button, .btn, [role="button"], select, input[type="text"], input[type="number"],
-input[type="email"], input[type="password"], input[type="date"], input[type="search"], textarea {
-  min-height: var(--cashier-tap);
+/* ============================================================
+   Cashier touch theme — finger-friendly clickables (1366x768)
+   min-height beats Tailwind's fixed h-* (an element is always at
+   least its min-height), so even h-8 buttons grow to a tap target.
+   ============================================================ */
+:root { --tap: 54px; }
+
+/* --- Buttons: large, obvious, with press feedback --- */
+button,
+.btn,
+[role="button"],
+a[href].btn,
+input[type="button"],
+input[type="submit"] {
+  min-height: var(--tap) !important;
+  font-size: 16px !important;
+  font-weight: 600;
+  border-radius: 12px;
+  padding-left: 16px;
+  padding-right: 16px;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+  transition: transform .06s ease, filter .12s ease;
+}
+button:active,
+.btn:active,
+[role="button"]:active {
+  transform: scale(.97);
+  filter: brightness(.94);
+}
+button svg, .btn svg, [role="button"] svg { pointer-events: none; }
+
+/* Icon-only / small buttons still get a real tap area */
+button:empty,
+button.icon,
+button[aria-label] { min-width: var(--tap); }
+
+/* --- Form fields: tall, readable, easy to hit --- */
+select,
+textarea,
+input[type="text"], input[type="number"], input[type="email"],
+input[type="password"], input[type="date"], input[type="search"],
+input[type="tel"], input:not([type]) {
+  min-height: var(--tap) !important;
+  font-size: 16px !important;
+  border-radius: 12px;
+  touch-action: manipulation;
+}
+textarea { min-height: 88px !important; }
+
+/* Bigger checkboxes / radios for fingers */
+input[type="checkbox"], input[type="radio"] {
+  width: 24px; height: 24px;
+}
+
+/* --- Navigation / sidebar: big rows --- */
+nav a, aside a, .sidebar a, nav button, aside button {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
   font-size: 16px;
 }
-/* Bigger, easier nav targets */
-nav a, aside a, .sidebar a { min-height: 46px; display: flex; align-items: center; }
-/* Larger table rows for touch */
-table td, table th { padding-top: 10px; padding-bottom: 10px; }
-/* Prevent text selection getting in the way of taps */
-nav, aside, button { -webkit-user-select: none; user-select: none; }
-/* Roomier tap area for icon buttons */
-button svg { pointer-events: none; }
+
+/* --- Tables: roomy rows + tap highlight --- */
+table td, table th {
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+  font-size: 15px;
+}
+table tbody tr { transition: background-color .1s ease; }
+table tbody tr:active { background-color: rgba(212,168,67,.12); }
+
+/* --- Modals: a touch bigger, easy close --- */
+[role="dialog"], .modal, .modal-content { font-size: 16px; }
+
+/* --- Wider scrollbars for touch drag --- */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-thumb { background: rgba(120,120,120,.5); border-radius: 8px; }
+
+/* --- POS: make product pick + cart controls pop --- */
+[class*="grid"] button { min-height: 64px; }            /* product / category tiles */
+.pos-product, .product-tile, .pos-tile { min-height: 84px; font-size: 16px; }
+
+/* Kill text selection on chrome so dragging doesn't select labels */
+nav, aside, button, .btn, th, label { -webkit-user-select: none; user-select: none; }
+
+/* Slightly larger base text everywhere for readability on a till */
+body { font-size: 15px; }
