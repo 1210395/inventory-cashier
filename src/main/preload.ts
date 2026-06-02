@@ -10,4 +10,6 @@ contextBridge.exposeInMainWorld('cashier', {
   saveSettings: (s: any) => ipcRenderer.invoke('cashier:saveSettings', s),
   reloadApp: () => ipcRenderer.invoke('cashier:reloadApp'),
   closeSettings: () => ipcRenderer.invoke('cashier:closeSettings'),
+  toggleFullscreen: () => ipcRenderer.invoke('cashier:toggleFullscreen'),
+  isFullscreen: () => ipcRenderer.invoke('cashier:isFullscreen'),
 });

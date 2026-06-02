@@ -15,43 +15,26 @@
       <div class="flex gap-6" style="min-height: calc(100vh - 180px);">
         <!-- LEFT PANEL: Product Search + Cart (60%) -->
         <div class="w-3/5 flex flex-col space-y-4">
-          <!-- Category tiles (touch-friendly, with subcategory drill-down) -->
+          <!-- Category drill-down: breadcrumb + current level (tap to go deeper) -->
           <div class="space-y-2">
-            <div class="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-5 gap-2">
+            <div class="flex items-center gap-1 flex-wrap text-sm">
+              <button class="crumb" :class="catPath.length ? 'crumb-link' : 'crumb-cur'" @click="goToLevel(-1)">{{ t('all') }}</button>
+              <template v-for="(c, i) in catPath" :key="c.uuid">
+                <span class="opacity-40">›</span>
+                <button class="crumb" :class="i === catPath.length - 1 ? 'crumb-cur' : 'crumb-link'" @click="goToLevel(i)">{{ catName(c) }}</button>
+              </template>
+            </div>
+            <div v-if="currentCategories.length" class="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-5 gap-2">
               <button
-                class="cat-tile"
-                :class="(!selectedTopUuid && !selectedCategoryUuid) ? 'cat-on' : 'cat-off'"
-                @click="selectAll()"
-              >{{ t('all') }}</button>
-              <button
-                v-for="cat in topCategories"
+                v-for="cat in currentCategories"
                 :key="cat.uuid"
                 class="cat-tile"
-                :class="selectedTopUuid === cat.uuid ? 'cat-on' : 'cat-off'"
-                @click="selectTop(cat)"
+                :class="selectedCategoryUuid === cat.uuid ? 'cat-on' : 'cat-off'"
+                @click="drillInto(cat)"
               >
                 <span class="truncate">{{ catName(cat) }}</span>
-                <span v-if="hasChildren(cat)" class="cat-caret">▾</span>
+                <span v-if="hasChildren(cat)" class="cat-caret">›</span>
               </button>
-            </div>
-
-            <!-- Subcategories of the selected parent -->
-            <div
-              v-if="subCategories.length"
-              class="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-5 gap-2 ltr:pl-2 rtl:pr-2 ltr:border-l-2 rtl:border-r-2 border-[#D4A843]/40"
-            >
-              <button
-                class="subcat-tile"
-                :class="selectedCategoryUuid === selectedTopUuid ? 'cat-on' : 'cat-off'"
-                @click="selectCategory(selectedTopUuid)"
-              >{{ t('all') }}</button>
-              <button
-                v-for="sc in subCategories"
-                :key="sc.uuid"
-                class="subcat-tile"
-                :class="selectedCategoryUuid === sc.uuid ? 'cat-on' : 'cat-off'"
-                @click="selectCategory(sc.uuid)"
-              >{{ catName(sc) }}</button>
             </div>
           </div>
 
@@ -479,35 +462,55 @@ const uiStore = useUiStore();
 // State
 const posCategories = ref([]);
 const selectedCategoryUuid = ref('');
-const selectedTopUuid = ref(''); // which parent's subcategory row is open
+const catPath = ref([]); // breadcrumb of drilled-into categories
 
 const _isAr = () => localStorage.getItem('locale') === 'ar';
 function catName(cat) {
   return _isAr() ? (cat.name_ar || cat.name_en) : (cat.name_en || cat.name_ar);
 }
 const topCategories = computed(() => posCategories.value.filter((c) => !c.parent_uuid));
-const subCategories = computed(() =>
-  selectedTopUuid.value
-    ? posCategories.value.filter((c) => c.parent_uuid === selectedTopUuid.value)
-    : []);
 function hasChildren(cat) {
   return posCategories.value.some((c) => c.parent_uuid === cat.uuid);
 }
-// Selecting a parent shows everything under it (parent + its children).
-function effectiveCategoryUuids() {
-  const sel = selectedCategoryUuid.value;
-  if (!sel) return [];
-  const kids = posCategories.value.filter((c) => c.parent_uuid === sel).map((c) => c.uuid);
-  return [sel, ...kids];
+// Categories shown at the current drill level: children of the last crumb,
+// or the top-level categories when at the root.
+const currentCategories = computed(() => {
+  const parent = catPath.value[catPath.value.length - 1];
+  return parent
+    ? posCategories.value.filter((c) => c.parent_uuid === parent.uuid)
+    : topCategories.value;
+});
+// All descendants of a category (so a parent shows everything beneath it).
+function descendantUuids(uuid) {
+  const out = [uuid];
+  let frontier = [uuid];
+  while (frontier.length) {
+    const next = [];
+    for (const c of posCategories.value) {
+      if (frontier.includes(c.parent_uuid)) { out.push(c.uuid); next.push(c.uuid); }
+    }
+    frontier = next;
+  }
+  return out;
 }
-function selectAll() {
-  selectedTopUuid.value = '';
-  selectedCategoryUuid.value = '';
+function effectiveCategoryUuids() {
+  return selectedCategoryUuid.value ? descendantUuids(selectedCategoryUuid.value) : [];
+}
+// Tap a category: filter products by it (+ all descendants) and, if it has
+// children, drill one level deeper so the user can keep narrowing.
+function drillInto(cat) {
+  selectedCategoryUuid.value = cat.uuid;
+  if (hasChildren(cat)) catPath.value = [...catPath.value, cat];
   triggerSearch();
 }
-function selectTop(cat) {
-  selectedTopUuid.value = cat.uuid;
-  selectedCategoryUuid.value = cat.uuid;
+function goToLevel(index) {
+  if (index < 0) {
+    catPath.value = [];
+    selectedCategoryUuid.value = '';
+  } else {
+    catPath.value = catPath.value.slice(0, index + 1);
+    selectedCategoryUuid.value = catPath.value[index]?.uuid || '';
+  }
   triggerSearch();
 }
 const productSearch = ref('');
@@ -983,7 +986,13 @@ onMounted(async () => {
 .cat-on { background: #D4A843; color: #1a1a1a; box-shadow: 0 2px 8px rgba(212,168,67,.4); }
 .cat-off { background: #f3f4f6; color: #374151; }
 :global(.dark) .cat-off { background: #374151; color: #e5e7eb; }
-.cat-caret { font-size: 11px; opacity: .7; }
+.cat-caret { font-size: 16px; opacity: .7; font-weight: 700; }
+
+/* Breadcrumb */
+.crumb { padding: 6px 10px; border-radius: 8px; font-weight: 600; min-height: 40px; }
+.crumb-cur { background: #D4A843; color: #1a1a1a; }
+.crumb-link { background: #f3f4f6; color: #374151; }
+:global(.dark) .crumb-link { background: #374151; color: #e5e7eb; }
 
 .prod-tile {
   min-height: 86px;

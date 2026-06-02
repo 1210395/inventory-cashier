@@ -82,6 +82,7 @@ app.whenReady().then(() => {
   globalShortcut.register('CommandOrControl+Shift+R', () => mainWindow?.reload());
   globalShortcut.register('CommandOrControl+Shift+Q', () => app.quit());
   globalShortcut.register('F12', () => mainWindow?.webContents.toggleDevTools());
+  globalShortcut.register('F11', () => mainWindow?.setFullScreen(!mainWindow.isFullScreen()));
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
@@ -174,6 +175,14 @@ ipcMain.handle('cashier:saveSettings', (_, s: Partial<Settings>) => {
   if (typeof s.openDrawerOnSale === 'boolean') store.set('openDrawerOnSale', s.openDrawerOnSale);
   return { success: true };
 });
+
+ipcMain.handle('cashier:toggleFullscreen', () => {
+  if (!mainWindow) return { fullscreen: false };
+  const next = !mainWindow.isFullScreen();
+  mainWindow.setFullScreen(next);
+  return { fullscreen: next };
+});
+ipcMain.handle('cashier:isFullscreen', () => ({ fullscreen: mainWindow?.isFullScreen() ?? false }));
 
 ipcMain.handle('cashier:reloadApp', () => { mainWindow?.loadFile(path.join(__dirname, '../renderer/index.html')); return { success: true }; });
 ipcMain.handle('cashier:closeSettings', () => { settingsWindow?.close(); return { success: true }; });

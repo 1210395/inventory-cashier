@@ -17,15 +17,15 @@
   >
     <!-- Title / drag bar -->
     <div class="osk-bar" @pointerdown="startDrag">
-      <button :class="['osk-tab', layout==='en' && 'on']" @click="layout='en'">EN</button>
-      <button :class="['osk-tab', layout==='ar' && 'on']" @click="layout='ar'">ع</button>
-      <button :class="['osk-tab', layout==='num' && 'on']" @click="layout='num'">123</button>
+      <button :class="['osk-tab', layout==='en' && 'on']" @pointerdown.prevent="layout='en'">EN</button>
+      <button :class="['osk-tab', layout==='ar' && 'on']" @pointerdown.prevent="layout='ar'">ع</button>
+      <button :class="['osk-tab', layout==='num' && 'on']" @pointerdown.prevent="layout='num'">123</button>
       <span class="osk-grip" v-if="!docked">⠿ {{ Math.round(scale*100) }}%</span>
       <span style="flex:1"></span>
-      <button class="osk-tab" @click="smaller" title="Smaller">－</button>
-      <button class="osk-tab" @click="bigger" title="Bigger">＋</button>
-      <button class="osk-tab" @click="toggleDock" :title="docked ? 'Pop out / move' : 'Dock to bottom'">{{ docked ? '⤢' : '▭' }}</button>
-      <button class="osk-tab" @click="hide" title="Close">✕</button>
+      <button class="osk-tab" @pointerdown.prevent="smaller" title="Smaller">－</button>
+      <button class="osk-tab" @pointerdown.prevent="bigger" title="Bigger">＋</button>
+      <button class="osk-tab" @pointerdown.prevent="toggleDock" :title="docked ? 'Pop out / move' : 'Dock to bottom'">{{ docked ? '⤢' : '▭' }}</button>
+      <button class="osk-tab" @pointerdown.prevent="hide" title="Close">✕</button>
     </div>
 
     <div class="osk-keys" :style="keysStyle">
@@ -34,15 +34,15 @@
           v-for="(k, ki) in row"
           :key="ki"
           class="osk-key"
-          @click="press(k)"
+          @pointerdown.prevent="press(k)"
         >{{ display(k) }}</button>
       </div>
 
       <div class="osk-row">
-        <button class="osk-key osk-fn" @click="toggleShift" v-if="layout==='en'" :class="{ on: shift }">⇧</button>
-        <button class="osk-key osk-fn" @click="backspace">⌫</button>
-        <button class="osk-key osk-space" @click="press(' ')">␣</button>
-        <button class="osk-key osk-fn" @click="enter">⏎</button>
+        <button class="osk-key osk-fn" @pointerdown.prevent="toggleShift" v-if="layout==='en'" :class="{ on: shift }">⇧</button>
+        <button class="osk-key osk-fn" @pointerdown.prevent="backspace">⌫</button>
+        <button class="osk-key osk-space" @pointerdown.prevent="press(' ')">␣</button>
+        <button class="osk-key osk-fn" @pointerdown.prevent="enter">⏎</button>
       </div>
     </div>
   </div>

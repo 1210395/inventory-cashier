@@ -235,6 +235,7 @@ export default {
   total_purchases: 'Total Purchase Cost',
   expenses_placeholder_note: 'Expense tracking via expenses module',
   cash_shifts: 'Cash Shifts',
+  cash_register: 'Cash Register',
   cash_shifts_sync_notice: 'Cash shift data is synced from the mobile app. Open and close shifts from the POS on your mobile device.',
   no_cash_shifts: 'No cash shift records found.',
   opened_at: 'Opened At',

@@ -19,6 +19,7 @@
       </div>
       <NavItem to="/dashboard" icon="&#x1F4CA;" :label="t('dashboard')" />
       <NavItem to="/pos" icon="&#x1F6D2;" :label="t('pos')" />
+      <NavItem to="/reports/cash-shifts" icon="&#x1F4B5;" :label="t('cash_register') || t('cash_shifts')" />
       <NavItem to="/tables" icon="&#x1F37D;&#xFE0F;" :label="t('tables') || 'Tables'" />
 
       <!-- Inventory -->
