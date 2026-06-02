@@ -37,7 +37,8 @@ export const useAuthStore = defineStore('auth', {
       } finally {
         this.user = null;
         clearToken();
-        window.location.href = '/login';
+        // Hash route so it works under file:// in the Electron cashier shell.
+        window.location.hash = '#/login';
       }
     },
 
