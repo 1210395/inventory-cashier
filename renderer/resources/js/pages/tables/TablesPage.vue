@@ -14,24 +14,29 @@
 
       <!-- Floor grouped by section -->
       <div v-for="section in sections" :key="section" class="mb-8">
-        <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">{{ section || (t('general') || 'General') }}</h2>
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <h2 class="text-base font-semibold uppercase tracking-wider text-gray-500 mb-3">{{ section || (t('general') || 'General') }}</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           <button
             v-for="table in tablesBySection(section)"
             :key="table.uuid"
-            class="rounded-xl border-2 p-4 text-left transition-all hover:shadow-md"
+            class="rounded-2xl border-2 p-5 text-left transition-all hover:shadow-lg active:scale-[0.98] min-h-[130px] flex flex-col"
             :class="statusClass(table.status)"
             @click="openTableModal(table)"
           >
-            <div class="flex items-center justify-between">
-              <span class="font-bold text-gray-900 dark:text-white">{{ table.name }}</span>
+            <div class="flex items-start justify-between">
+              <span class="font-bold text-xl text-gray-900 dark:text-white">{{ table.name }}</span>
               <AppBadge :variant="statusVariant(table.status)" :text="t(table.status) || table.status" />
             </div>
-            <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              {{ t('capacity') || 'Seats' }}: {{ table.capacity }}
+            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              &#x1F465; {{ table.capacity || '-' }}
             </div>
-            <div v-if="table.current_invoice" class="mt-2 text-sm font-semibold text-gray-800 dark:text-gray-200">
-              {{ formatCurrency(table.current_invoice.total) }}
+            <div class="mt-auto pt-2">
+              <span v-if="table.current_invoice" class="text-2xl font-extrabold text-[#D4A843]">
+                {{ formatCurrency(table.current_invoice.total) }}
+              </span>
+              <span v-else class="text-sm font-medium text-green-600 dark:text-green-400">
+                {{ t('available') || 'Available' }}
+              </span>
             </div>
           </button>
         </div>

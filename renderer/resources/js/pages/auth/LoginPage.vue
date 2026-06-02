@@ -31,7 +31,7 @@
               type="email"
               required
               autocomplete="email"
-              class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition"
+              class="w-full px-4 py-4 text-lg rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition"
               :placeholder="t('email')"
             />
           </div>
@@ -46,7 +46,7 @@
               type="password"
               required
               autocomplete="current-password"
-              class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition"
+              class="w-full px-4 py-4 text-lg rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition"
               :placeholder="t('password')"
             />
           </div>
@@ -54,7 +54,7 @@
           <button
             type="submit"
             :disabled="loading"
-            class="w-full py-2.5 px-4 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full py-4 px-4 text-lg bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span v-if="loading" class="inline-flex items-center">
               <svg class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -90,7 +90,7 @@ async function handleLogin() {
   loading.value = true;
   try {
     await auth.login(email.value, password.value);
-    router.push('/dashboard');
+    router.push('/pos');
   } catch (e) {
     if (e.response && e.response.status === 422) {
       const errors = e.response.data.errors;

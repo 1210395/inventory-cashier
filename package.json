@@ -1,6 +1,6 @@
 {
   "name": "hisab-cashier",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Hisab Cashier - Touchscreen kiosk shell for the Hisab web app (on-screen keyboard, ESC/POS cash drawer)",
   "author": "Olive Dev",
   "main": "dist/main/main.js",

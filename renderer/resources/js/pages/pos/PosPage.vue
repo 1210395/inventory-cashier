@@ -106,7 +106,14 @@
           <div
             v-else-if="selectedCategoryUuid || productSearch"
             class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-center text-sm text-gray-400"
-          >{{ t('no_data') || 'No products' }}</div>
+          >{{ _isAr() ? 'لا توجد منتجات هنا' : 'No products here' }}</div>
+          <div
+            v-else
+            class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-center text-gray-400 dark:text-gray-500"
+          >
+            <div class="text-3xl mb-1">&#x1F446;</div>
+            <div class="text-sm">{{ _isAr() ? 'اختر فئة لعرض المنتجات' : 'Tap a category above to see products' }}</div>
+          </div>
 
           <!-- Cart Table -->
           <div class="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden flex flex-col">
@@ -149,20 +156,20 @@
                       />
                     </td>
                     <td class="px-4 py-3">
-                      <div class="flex items-center justify-center gap-1">
+                      <div class="flex items-center justify-center gap-2">
                         <button
-                          class="w-7 h-7 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
+                          class="w-11 h-11 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 active:scale-95 flex items-center justify-center text-2xl font-bold leading-none transition"
                           @click="decrementQty(idx)"
-                        >-</button>
+                        >−</button>
                         <input
                           v-model.number="item.quantity"
                           type="number"
                           min="1"
-                          class="w-14 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1 py-1 text-sm text-center text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-[#D4A843]"
+                          class="w-16 h-11 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1 text-base font-semibold text-center text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#D4A843]"
                           @input="recalcCartItem(idx)"
                         />
                         <button
-                          class="w-7 h-7 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
+                          class="w-11 h-11 rounded-lg bg-[#D4A843] text-gray-900 hover:brightness-95 active:scale-95 flex items-center justify-center text-2xl font-bold leading-none transition"
                           @click="incrementQty(idx)"
                         >+</button>
                       </div>
@@ -196,11 +203,12 @@
                     </td>
                     <td class="px-2 py-3">
                       <button
-                        class="text-red-500 hover:text-red-700 dark:hover:text-red-400 transition-colors p-1"
+                        class="w-11 h-11 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 active:scale-95 transition"
+                        :title="t('delete')"
                         @click="removeFromCart(idx)"
                       >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
                     </td>
@@ -424,17 +432,21 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">{{ t('sale_completed') }}</h3>
-          <div class="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-            <p>{{ t('invoice_number') }}: <span class="font-medium text-gray-900 dark:text-white">{{ receiptData.invoice_number }}</span></p>
-            <p>{{ t('items') }}: <span class="font-medium text-gray-900 dark:text-white">{{ receiptData.items_count }}</span></p>
-            <p>{{ t('total') }}: <span class="font-semibold text-[#D4A843]">{{ formatCurrency(receiptData.total) }}</span></p>
-            <p>{{ t('paid') }}: <span class="font-medium text-green-600 dark:text-green-400">{{ formatCurrency(receiptData.paid) }}</span></p>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">{{ t('sale_completed') }}</h3>
+          <p class="text-xs text-gray-400 mb-4">{{ receiptData.invoice_number }}</p>
+          <div class="text-4xl font-extrabold text-[#D4A843] mb-4">{{ formatCurrency(receiptData.total) }}</div>
+          <div class="mx-auto max-w-xs space-y-1.5 text-sm text-gray-600 dark:text-gray-400">
+            <div class="flex justify-between"><span>{{ t('items') }}</span><span class="font-medium text-gray-900 dark:text-white">{{ receiptData.items_count }}</span></div>
+            <div class="flex justify-between"><span>{{ t('paid') }}</span><span class="font-medium text-green-600 dark:text-green-400">{{ formatCurrency(receiptData.paid) }}</span></div>
+            <div v-if="receiptData.paid > receiptData.total" class="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-1.5 text-base font-bold">
+              <span class="text-gray-900 dark:text-white">{{ t('change') }}</span>
+              <span class="text-green-600 dark:text-green-400">{{ formatCurrency(receiptData.paid - receiptData.total) }}</span>
+            </div>
           </div>
         </div>
         <template #footer>
           <AppButton variant="secondary" @click="printReceipt">{{ t('print_receipt') }}</AppButton>
-          <AppButton variant="primary" @click="closeReceipt">{{ t('new_sale') }}</AppButton>
+          <AppButton variant="primary" class="!min-h-[60px] !text-lg !font-bold !px-8" @click="closeReceipt">{{ t('new_sale') }}</AppButton>
         </template>
       </AppModal>
 
