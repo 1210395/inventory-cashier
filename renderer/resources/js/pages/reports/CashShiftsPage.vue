@@ -22,6 +22,11 @@
         </div>
       </div>
 
+      <!-- Redirected from POS without an open shift -->
+      <div v-if="$route.query.need_shift && !currentShift" class="mb-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 p-4 text-sm font-medium text-amber-800 dark:text-amber-300">
+        {{ needShiftMsg }}
+      </div>
+
       <!-- Current open shift card -->
       <div v-if="currentShift" class="mb-6 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4">
         <div class="flex items-center justify-between">
@@ -151,7 +156,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import api from '../../composables/useApi.js';
-import { t } from '../../i18n/index.js';
+import { t, locale } from '../../i18n/index.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
 import AppDataTable from '../../components/base/AppDataTable.vue';
 import AppBadge from '../../components/base/AppBadge.vue';
@@ -187,6 +192,11 @@ const columns = [
 function expectedCash(s) {
   return Number(s.open_amount || 0) + Number(s.cash_sales || 0) + Number(s.cash_in || 0) - Number(s.cash_out || 0);
 }
+
+const needShiftMsg = computed(() =>
+  locale.value === 'ar'
+    ? 'افتح وردية صندوق لبدء البيع على نقطة البيع.'
+    : 'Open a cash shift to start selling on the POS.');
 
 const closeDifference = computed(() => {
   if (!currentShift.value || closeForm.value.close_amount === '') return 0;

@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth.js';
+import api from '../composables/useApi.js';
 
 // Lazy-loaded page components
 const LoginPage = () => import('../pages/auth/LoginPage.vue');
@@ -149,7 +150,7 @@ const routes = [
     path: '/pos',
     name: 'POS',
     component: PosPage,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresShift: true },
   },
   {
     path: '/tables',
@@ -282,6 +283,18 @@ router.beforeEach(async (to, from, next) => {
   // If logged in and going to login page, redirect to dashboard
   if (to.name === 'Login' && auth.isAuthenticated) {
     return next({ name: 'Dashboard' });
+  }
+
+  // The POS (till) cannot be opened without an active cash-register shift.
+  if (to.meta.requiresShift) {
+    try {
+      await api.get('/cash-shifts/current'); // 200 = a shift is open
+    } catch (e) {
+      if (e.response && e.response.status === 404) {
+        return next({ path: '/reports/cash-shifts', query: { need_shift: '1' } });
+      }
+      // Network/other error: don't lock the till over a transient failure.
+    }
   }
 
   next();
