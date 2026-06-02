@@ -262,15 +262,6 @@
         </template>
       </AppModal>
 
-      <!-- Hidden print area for barcode labels -->
-      <div ref="printArea" class="hidden print:block">
-        <div v-for="p in selectedProducts" :key="p.uuid" style="page-break-inside: avoid; padding: 8px; border: 1px dashed #ccc; margin-bottom: 8px; display: inline-block; width: 48%; text-align: center;">
-          <p style="font-weight: bold; font-size: 14px; margin: 0;">{{ p.name_en }}</p>
-          <p v-if="p.barcode" style="font-family: monospace; font-size: 20px; letter-spacing: 4px; margin: 8px 0;">{{ p.barcode }}</p>
-          <p v-if="p.sku" style="font-size: 11px; color: #666; margin: 0;">SKU: {{ p.sku }}</p>
-          <p style="font-size: 13px; margin: 4px 0 0 0;">{{ formatCurrency(p.sell_price) }}</p>
-        </div>
-      </div>
     </div>
   </AppLayout>
 </template>
@@ -280,6 +271,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import api from '../../composables/useApi.js';
 import { t } from '../../i18n/index.js';
+import { printLabels } from '../../composables/print.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
 import AppButton from '../../components/base/AppButton.vue';
 import AppBadge from '../../components/base/AppBadge.vue';
@@ -323,7 +315,6 @@ const selectedUuids = ref(new Set());
 const showBulkPriceModal = ref(false);
 const bulkPricePercent = ref(0);
 const bulkUpdating = ref(false);
-const printArea = ref(null);
 
 const selectedProducts = computed(() =>
   products.value.filter((p) => selectedUuids.value.has(p.uuid))
@@ -351,19 +342,8 @@ function toggleSelectAll() {
 
 function bulkPrintLabels() {
   if (selectedUuids.value.size === 0) return;
-  // Temporarily show the print area
-  const el = printArea.value;
-  if (el) {
-    el.classList.remove('hidden');
-    el.classList.add('block');
-  }
-  setTimeout(() => {
-    window.print();
-    if (el) {
-      el.classList.remove('block');
-      el.classList.add('hidden');
-    }
-  }, 100);
+  // Clean standalone label document (not a screenshot of the page).
+  printLabels({ products: selectedProducts.value, fmt: formatCurrency, t });
 }
 
 async function bulkDelete() {

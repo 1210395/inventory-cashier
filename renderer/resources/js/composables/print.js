@@ -91,6 +91,30 @@ export function printInvoice({ invoice, settings, fmt, t, partyName, partyPhone 
   openAndPrint(invoice.invoice_number || (t('invoice') || 'Invoice'), body, 'max-width: 800px; margin: 0 auto;');
 }
 
+// Barcode label sheet — a clean printable document (not a page screenshot).
+export function printLabels({ products, fmt, t }) {
+  const cards = (products || []).map((p) => `
+    <div class="label">
+      <div class="name">${esc(p.name_en || p.name || p.name_ar || '-')}</div>
+      ${p.barcode ? `<div class="code">${esc(p.barcode)}</div>` : ''}
+      ${p.sku ? `<div class="sku">SKU: ${esc(p.sku)}</div>` : ''}
+      <div class="price">${esc(fmt(p.sell_price))}</div>
+    </div>`).join('');
+  const body = `
+    <style>
+      body { padding: 8px; }
+      .sheet { display: flex; flex-wrap: wrap; gap: 8px; }
+      .label { width: 48%; box-sizing: border-box; border: 1px dashed #bbb; border-radius: 6px;
+               padding: 8px; text-align: center; page-break-inside: avoid; }
+      .name { font-weight: bold; font-size: 14px; }
+      .code { font-family: 'Libre Barcode 39', 'Courier New', monospace; font-size: 22px; letter-spacing: 4px; margin: 6px 0; }
+      .sku { font-size: 11px; color: #666; }
+      .price { font-size: 13px; margin-top: 4px; }
+    </style>
+    <div class="sheet">${cards}</div>`;
+  openAndPrint(t('print_labels') || 'Labels', body, 'max-width: 800px; margin: 0 auto;');
+}
+
 // 80mm thermal receipt for POS sales.
 export function printReceipt({ lines, settings, fmt, t, totals, paymentMethod }) {
   const s = settings || {};

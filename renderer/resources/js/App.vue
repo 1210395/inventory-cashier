@@ -1,6 +1,7 @@
 <template>
   <router-view />
   <OnScreenKeyboard />
+  <PinLock />
   <button
     v-if="hasDrawer"
     class="cashier-drawer-fab"
@@ -12,6 +13,7 @@
 <script setup>
 import { ref } from 'vue';
 import OnScreenKeyboard from './components/OnScreenKeyboard.vue';
+import PinLock from './components/PinLock.vue';
 
 const hasDrawer = ref(typeof window !== 'undefined' && !!window.cashier);
 
