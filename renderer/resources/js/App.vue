@@ -17,17 +17,44 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import OnScreenKeyboard from './components/OnScreenKeyboard.vue';
 import PinLock from './components/PinLock.vue';
+import api from './composables/useApi.js';
 
 const hasNative = ref(typeof window !== 'undefined' && !!window.cashier);
 const isFs = ref(true);
+let rolloverTimer = null;
 
 onMounted(async () => {
   if (!hasNative.value) return;
   try { const r = await window.cashier.isFullscreen(); isFs.value = !!r?.fullscreen; } catch { /* noop */ }
+  // Midnight auto close/reopen of the cash shift (local device time), if enabled.
+  maybeRollover();
+  rolloverTimer = setInterval(maybeRollover, 60000);
 });
+
+onBeforeUnmount(() => { if (rolloverTimer) clearInterval(rolloverTimer); });
+
+async function maybeRollover() {
+  if (localStorage.getItem('autoRolloverMidnight') !== 'true') return;
+  const today = new Date().toLocaleDateString('en-CA'); // local YYYY-MM-DD
+  const last = localStorage.getItem('lastRolloverDate');
+  if (!last) { localStorage.setItem('lastRolloverDate', today); return; }
+  if (last === today) return;
+  // A new local day has started — roll the shift over.
+  localStorage.setItem('lastRolloverDate', today); // set first to avoid re-entry
+  try {
+    const res = await api.get('/cash-shifts/current'); // 200 only if a shift is open
+    const shift = res.data?.data || res.data;
+    if (shift && shift.uuid) {
+      const expected = Number(shift.open_amount || 0) + Number(shift.cash_sales || 0)
+        + Number(shift.cash_in || 0) - Number(shift.cash_out || 0);
+      await api.post(`/cash-shifts/${shift.uuid}/close`, { close_amount: expected, notes: 'Auto midnight rollover' });
+      await api.post('/cash-shifts', { open_amount: expected, notes: 'Auto midnight rollover' });
+    }
+  } catch (e) { /* 404 = no open shift; other errors retried next day */ }
+}
 
 async function toggleFullscreen() {
   try { const r = await window.cashier?.toggleFullscreen(); isFs.value = !!r?.fullscreen; } catch { /* noop */ }

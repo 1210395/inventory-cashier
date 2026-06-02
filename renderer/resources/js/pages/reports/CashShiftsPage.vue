@@ -16,9 +16,11 @@
           <AppButton v-if="!currentShift" variant="primary" @click="openShiftModal">
             {{ t('open_shift') || 'Open Shift' }}
           </AppButton>
-          <AppButton v-else variant="danger" @click="openCloseModal">
-            {{ t('close_shift') || 'Close Shift' }}
-          </AppButton>
+          <template v-else>
+            <AppButton variant="secondary" @click="openMovement('in')">+ {{ t('cash_in') || 'Cash In' }}</AppButton>
+            <AppButton variant="secondary" @click="openMovement('out')">- {{ t('cash_out') || 'Cash Out' }}</AppButton>
+            <AppButton variant="danger" @click="openCloseModal">{{ t('close_shift') || 'Close Shift' }}</AppButton>
+          </template>
         </div>
       </div>
 
@@ -26,6 +28,12 @@
       <div v-if="$route.query.need_shift && !currentShift" class="mb-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 p-4 text-sm font-medium text-amber-800 dark:text-amber-300">
         {{ needShiftMsg }}
       </div>
+
+      <!-- Auto close/reopen at midnight (cashier terminal) -->
+      <label v-if="isCashier" class="mb-4 flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 cursor-pointer select-none">
+        <input type="checkbox" :checked="autoRollover" @change="toggleAutoRollover" class="w-5 h-5 accent-[#D4A843]" />
+        <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('auto_close_midnight') || 'Auto close & reopen at midnight' }}</span>
+      </label>
 
       <!-- Current open shift card -->
       <div v-if="currentShift" class="mb-6 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4">
@@ -41,6 +49,24 @@
             <div><div class="text-gray-500">{{ t('cash_sales') || 'Cash Sales' }}</div><div class="font-semibold">{{ formatCurrency(currentShift.cash_sales) }}</div></div>
             <div><div class="text-gray-500">{{ t('total_sales') || 'Total Sales' }}</div><div class="font-semibold">{{ formatCurrency(currentShift.total_sales) }}</div></div>
             <div><div class="text-gray-500">{{ t('expected') || 'Expected' }}</div><div class="font-semibold">{{ formatCurrency(expectedCash(currentShift)) }}</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cash movements for the current open shift -->
+      <div v-if="currentShift && (currentShift.movements || []).length" class="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+        <div class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">{{ t('cash_movements') || 'Cash Movements' }}</div>
+        <div class="divide-y divide-gray-100 dark:divide-gray-700/50">
+          <div v-for="m in currentShift.movements" :key="m.uuid" class="flex items-center justify-between py-2 text-sm">
+            <div>
+              <span :class="m.type === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" class="font-medium">
+                {{ m.type === 'in' ? (t('cash_in') || 'Cash In') : (t('cash_out') || 'Cash Out') }}
+              </span>
+              <span v-if="m.note" class="text-gray-400 dark:text-gray-500 ml-2">— {{ m.note }}</span>
+            </div>
+            <span :class="m.type === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" class="font-semibold">
+              {{ m.type === 'in' ? '+' : '-' }}{{ formatCurrency(m.amount) }}
+            </span>
           </div>
         </div>
       </div>
@@ -149,6 +175,28 @@
           <AppButton variant="danger" :disabled="saving" @click="submitClose">{{ t('close_shift') || 'Close Shift' }}</AppButton>
         </template>
       </AppModal>
+
+      <!-- Cash In / Out Modal -->
+      <AppModal :show="showMovementModal" :title="movementForm.type === 'in' ? (t('cash_in') || 'Cash In') : (t('cash_out') || 'Cash Out')" @close="showMovementModal = false">
+        <div class="space-y-4">
+          <AppInput
+            v-model="movementForm.amount"
+            :label="t('amount') || 'Amount'"
+            type="number"
+            :error="movementErrors.amount"
+            required
+          />
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ t('notes') }}</label>
+            <textarea v-model="movementForm.note" rows="2"
+              class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#D4A843]"></textarea>
+          </div>
+        </div>
+        <template #footer>
+          <AppButton variant="secondary" @click="showMovementModal = false">{{ t('cancel') }}</AppButton>
+          <AppButton variant="primary" :disabled="saving" @click="submitMovement">{{ t('save') }}</AppButton>
+        </template>
+      </AppModal>
     </div>
   </AppLayout>
 </template>
@@ -177,6 +225,50 @@ const closeForm = ref({ close_amount: '', notes: '' });
 const openErrors = ref({});
 const closeErrors = ref({});
 
+const showMovementModal = ref(false);
+const movementForm = ref({ type: 'in', amount: '', note: '' });
+const movementErrors = ref({});
+
+const needShiftMsg = computed(() =>
+  locale.value === 'ar'
+    ? 'افتح وردية صندوق لبدء البيع على نقطة البيع.'
+    : 'Open a cash shift to start selling on the POS.');
+
+// Client-side auto-rollover toggle (the App-level timer reads this flag).
+const isCashier = typeof window !== 'undefined' && !!window.cashier;
+const autoRollover = ref(localStorage.getItem('autoRolloverMidnight') === 'true');
+function toggleAutoRollover() {
+  autoRollover.value = !autoRollover.value;
+  localStorage.setItem('autoRolloverMidnight', String(autoRollover.value));
+}
+
+function openMovement(type) {
+  movementErrors.value = {};
+  movementForm.value = { type, amount: '', note: '' };
+  showMovementModal.value = true;
+}
+
+async function submitMovement() {
+  if (movementForm.value.amount === '' || Number(movementForm.value.amount) <= 0) {
+    movementErrors.value = { amount: t('required') || 'Required' };
+    return;
+  }
+  saving.value = true;
+  try {
+    await api.post(`/cash-shifts/${currentShift.value.uuid}/movement`, {
+      type: movementForm.value.type,
+      amount: Number(movementForm.value.amount),
+      note: movementForm.value.note || null,
+    });
+    showMovementModal.value = false;
+    await refresh();
+  } catch (err) {
+    error.value = err.response?.data?.message || 'Failed to record cash movement.';
+  } finally {
+    saving.value = false;
+  }
+}
+
 const columns = [
   { key: 'opened_at', label: t('opened_at') || 'Opened At', sortable: true },
   { key: 'closed_at', label: t('closed_at') || 'Closed At', sortable: true },
@@ -192,11 +284,6 @@ const columns = [
 function expectedCash(s) {
   return Number(s.open_amount || 0) + Number(s.cash_sales || 0) + Number(s.cash_in || 0) - Number(s.cash_out || 0);
 }
-
-const needShiftMsg = computed(() =>
-  locale.value === 'ar'
-    ? 'افتح وردية صندوق لبدء البيع على نقطة البيع.'
-    : 'Open a cash shift to start selling on the POS.');
 
 const closeDifference = computed(() => {
   if (!currentShift.value || closeForm.value.close_amount === '') return 0;
