@@ -15,28 +15,44 @@
       <div class="flex gap-6" style="min-height: calc(100vh - 180px);">
         <!-- LEFT PANEL: Product Search + Cart (60%) -->
         <div class="w-3/5 flex flex-col space-y-4">
-          <!-- Category Filter Bar -->
-          <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-            <button
-              class="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
-              :class="!selectedCategoryUuid
-                ? 'bg-[#D4A843] text-gray-900 shadow-sm'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
-              @click="selectCategory('')"
+          <!-- Category tiles (touch-friendly, with subcategory drill-down) -->
+          <div class="space-y-2">
+            <div class="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-5 gap-2">
+              <button
+                class="cat-tile"
+                :class="(!selectedTopUuid && !selectedCategoryUuid) ? 'cat-on' : 'cat-off'"
+                @click="selectAll()"
+              >{{ t('all') }}</button>
+              <button
+                v-for="cat in topCategories"
+                :key="cat.uuid"
+                class="cat-tile"
+                :class="selectedTopUuid === cat.uuid ? 'cat-on' : 'cat-off'"
+                @click="selectTop(cat)"
+              >
+                <span class="truncate">{{ catName(cat) }}</span>
+                <span v-if="hasChildren(cat)" class="cat-caret">▾</span>
+              </button>
+            </div>
+
+            <!-- Subcategories of the selected parent -->
+            <div
+              v-if="subCategories.length"
+              class="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-5 gap-2 ltr:pl-2 rtl:pr-2 ltr:border-l-2 rtl:border-r-2 border-[#D4A843]/40"
             >
-              {{ t('all') }}
-            </button>
-            <button
-              v-for="cat in posCategories"
-              :key="cat.uuid"
-              class="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
-              :class="selectedCategoryUuid === cat.uuid
-                ? 'bg-[#D4A843] text-gray-900 shadow-sm'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
-              @click="selectCategory(cat.uuid)"
-            >
-              {{ cat.name_en }}
-            </button>
+              <button
+                class="subcat-tile"
+                :class="selectedCategoryUuid === selectedTopUuid ? 'cat-on' : 'cat-off'"
+                @click="selectCategory(selectedTopUuid)"
+              >{{ t('all') }}</button>
+              <button
+                v-for="sc in subCategories"
+                :key="sc.uuid"
+                class="subcat-tile"
+                :class="selectedCategoryUuid === sc.uuid ? 'cat-on' : 'cat-off'"
+                @click="selectCategory(sc.uuid)"
+              >{{ catName(sc) }}</button>
+            </div>
           </div>
 
           <!-- Product Search -->
@@ -85,6 +101,29 @@
               </button>
             </div>
           </div>
+
+          <!-- Filtered product grid (tap a tile to add to cart) -->
+          <div v-if="searchResults.length > 0" class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-2">
+            <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 max-h-72 overflow-y-auto">
+              <button
+                v-for="product in searchResults"
+                :key="product.uuid"
+                class="prod-tile"
+                :disabled="product.quantity <= 0"
+                @click="addToCart(product)"
+              >
+                <span class="prod-name">{{ catName(product) }}</span>
+                <span class="prod-price">{{ formatCurrency(product.sell_price) }}</span>
+                <span class="prod-stock" :class="{ 'prod-out': product.quantity <= 0 }">
+                  {{ product.quantity > 0 ? (t('in_stock') + ': ' + product.quantity) : (t('out_of_stock') || 'Out of stock') }}
+                </span>
+              </button>
+            </div>
+          </div>
+          <div
+            v-else-if="selectedCategoryUuid || productSearch"
+            class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-center text-sm text-gray-400"
+          >{{ t('no_data') || 'No products' }}</div>
 
           <!-- Cart Table -->
           <div class="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden flex flex-col">
@@ -440,6 +479,37 @@ const uiStore = useUiStore();
 // State
 const posCategories = ref([]);
 const selectedCategoryUuid = ref('');
+const selectedTopUuid = ref(''); // which parent's subcategory row is open
+
+const _isAr = () => localStorage.getItem('locale') === 'ar';
+function catName(cat) {
+  return _isAr() ? (cat.name_ar || cat.name_en) : (cat.name_en || cat.name_ar);
+}
+const topCategories = computed(() => posCategories.value.filter((c) => !c.parent_uuid));
+const subCategories = computed(() =>
+  selectedTopUuid.value
+    ? posCategories.value.filter((c) => c.parent_uuid === selectedTopUuid.value)
+    : []);
+function hasChildren(cat) {
+  return posCategories.value.some((c) => c.parent_uuid === cat.uuid);
+}
+// Selecting a parent shows everything under it (parent + its children).
+function effectiveCategoryUuids() {
+  const sel = selectedCategoryUuid.value;
+  if (!sel) return [];
+  const kids = posCategories.value.filter((c) => c.parent_uuid === sel).map((c) => c.uuid);
+  return [sel, ...kids];
+}
+function selectAll() {
+  selectedTopUuid.value = '';
+  selectedCategoryUuid.value = '';
+  triggerSearch();
+}
+function selectTop(cat) {
+  selectedTopUuid.value = cat.uuid;
+  selectedCategoryUuid.value = cat.uuid;
+  triggerSearch();
+}
 const productSearch = ref('');
 const searchResults = ref([]);
 const showScanner = ref(false);
@@ -570,13 +640,15 @@ async function triggerSearch() {
     if (productSearch.value) {
       params.search = productSearch.value;
     }
-    if (selectedCategoryUuid.value) {
-      params['category_uuid[]'] = selectedCategoryUuid.value;
+    const catUuids = effectiveCategoryUuids();
+    if (catUuids.length) {
+      params['category_uuid[]'] = catUuids;
     }
     const response = await api.get('/products', { params });
     const allProducts = response.data.data || response.data;
     searchResults.value = allProducts.filter((p) => p.show_on_pos !== false && p.show_on_pos !== 0);
-    showResults.value = true;
+    // Only show the overlay dropdown while typing; category taps fill the grid.
+    showResults.value = !!productSearch.value;
   } catch (e) {
     searchResults.value = [];
   }
@@ -889,3 +961,47 @@ onMounted(async () => {
   }
 });
 </script>
+
+<style scoped>
+/* Touch-friendly category + product tiles */
+.cat-tile, .subcat-tile {
+  min-height: 60px;
+  border-radius: 14px;
+  padding: 8px 10px;
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+  border: 1px solid transparent;
+  transition: transform .06s ease, filter .12s ease;
+}
+.subcat-tile { min-height: 48px; font-size: 14px; font-weight: 600; border-radius: 12px; }
+.cat-tile:active, .subcat-tile:active, .prod-tile:active { transform: scale(.97); filter: brightness(.95); }
+.cat-on { background: #D4A843; color: #1a1a1a; box-shadow: 0 2px 8px rgba(212,168,67,.4); }
+.cat-off { background: #f3f4f6; color: #374151; }
+:global(.dark) .cat-off { background: #374151; color: #e5e7eb; }
+.cat-caret { font-size: 11px; opacity: .7; }
+
+.prod-tile {
+  min-height: 86px;
+  border-radius: 14px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  transition: transform .06s ease, filter .12s ease;
+}
+:global(.dark) .prod-tile { background: #1f2937; border-color: #374151; }
+.prod-tile:disabled { opacity: .45; }
+.prod-name { font-weight: 600; font-size: 14px; line-height: 1.2; text-align: start;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.prod-price { font-weight: 800; font-size: 16px; color: #D4A843; }
+.prod-stock { font-size: 11px; color: #9ca3af; }
+.prod-out { color: #ef4444; font-weight: 600; }
+</style>

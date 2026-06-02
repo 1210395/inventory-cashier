@@ -3,17 +3,10 @@
     <!-- Sidebar -->
     <Sidebar />
 
-    <!-- Sidebar overlay for mobile -->
-    <div
-      v-if="ui.sidebarOpen"
-      class="fixed inset-0 bg-black/40 z-20 lg:hidden"
-      @click="ui.toggleSidebar()"
-    ></div>
-
-    <!-- Main content area -->
+    <!-- Main content area (shifted by the sidebar rail; collapses to an icon rail) -->
     <div
       class="transition-all duration-300"
-      :class="ui.sidebarOpen ? 'lg:ltr:ml-64 lg:rtl:mr-64' : ''"
+      :class="ui.sidebarOpen ? 'ltr:ml-64 rtl:mr-64' : 'ltr:ml-16 rtl:mr-16'"
     >
       <!-- Topbar -->
       <Topbar />

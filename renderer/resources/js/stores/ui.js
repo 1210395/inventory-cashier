@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 
 export const useUiStore = defineStore('ui', {
   state: () => ({
-    sidebarOpen: true,
+    sidebarOpen: localStorage.getItem('sidebarOpen') !== 'false',
     darkMode: localStorage.getItem('darkMode') === 'true',
     locale: localStorage.getItem('locale') || 'en',
     settings: {
@@ -36,6 +36,7 @@ export const useUiStore = defineStore('ui', {
   actions: {
     toggleSidebar() {
       this.sidebarOpen = !this.sidebarOpen;
+      localStorage.setItem('sidebarOpen', String(this.sidebarOpen));
     },
 
     toggleDarkMode() {
