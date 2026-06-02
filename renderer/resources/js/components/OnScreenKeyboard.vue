@@ -2,35 +2,48 @@
   <!-- Floating toggle (always reachable) -->
   <button
     class="osk-fab"
-    :style="{ bottom: visible ? oskHeight + 12 + 'px' : '12px' }"
+    :style="{ bottom: (visible && docked) ? oskHeight + 12 + 'px' : '12px' }"
     @mousedown.prevent
     @click="toggle"
-    :title="'Keyboard'"
+    title="Keyboard"
   >⌨</button>
 
-  <div v-if="visible" ref="kb" class="osk" @mousedown.prevent>
-    <div class="osk-bar">
+  <div
+    v-if="visible"
+    ref="kb"
+    :class="['osk', docked ? 'osk-docked' : 'osk-floating']"
+    :style="floatStyle"
+    @mousedown.prevent
+  >
+    <!-- Title / drag bar -->
+    <div class="osk-bar" @pointerdown="startDrag">
       <button :class="['osk-tab', layout==='en' && 'on']" @click="layout='en'">EN</button>
       <button :class="['osk-tab', layout==='ar' && 'on']" @click="layout='ar'">ع</button>
       <button :class="['osk-tab', layout==='num' && 'on']" @click="layout='num'">123</button>
+      <span class="osk-grip" v-if="!docked">⠿ {{ Math.round(scale*100) }}%</span>
       <span style="flex:1"></span>
-      <button class="osk-tab" @click="hide">✕</button>
+      <button class="osk-tab" @click="smaller" title="Smaller">－</button>
+      <button class="osk-tab" @click="bigger" title="Bigger">＋</button>
+      <button class="osk-tab" @click="toggleDock" :title="docked ? 'Pop out / move' : 'Dock to bottom'">{{ docked ? '⤢' : '▭' }}</button>
+      <button class="osk-tab" @click="hide" title="Close">✕</button>
     </div>
 
-    <div v-for="(row, ri) in rows" :key="ri" class="osk-row">
-      <button
-        v-for="(k, ki) in row"
-        :key="ki"
-        class="osk-key"
-        @click="press(k)"
-      >{{ display(k) }}</button>
-    </div>
+    <div class="osk-keys" :style="keysStyle">
+      <div v-for="(row, ri) in rows" :key="ri" class="osk-row">
+        <button
+          v-for="(k, ki) in row"
+          :key="ki"
+          class="osk-key"
+          @click="press(k)"
+        >{{ display(k) }}</button>
+      </div>
 
-    <div class="osk-row">
-      <button class="osk-key osk-fn" @click="toggleShift" v-if="layout==='en'" :class="{ on: shift }">⇧</button>
-      <button class="osk-key osk-fn" @click="backspace">⌫</button>
-      <button class="osk-key osk-space" @click="press(' ')">␣</button>
-      <button class="osk-key osk-fn" @click="enter">⏎</button>
+      <div class="osk-row">
+        <button class="osk-key osk-fn" @click="toggleShift" v-if="layout==='en'" :class="{ on: shift }">⇧</button>
+        <button class="osk-key osk-fn" @click="backspace">⌫</button>
+        <button class="osk-key osk-space" @click="press(' ')">␣</button>
+        <button class="osk-key osk-fn" @click="enter">⏎</button>
+      </div>
     </div>
   </div>
 </template>
@@ -44,6 +57,32 @@ const shift = ref(false);
 const kb = ref(null);
 const oskHeight = ref(0);
 let lastFocused = null;
+
+// --- Persisted layout prefs (docked vs floating, position, scale) ---
+const docked = ref(localStorage.getItem('osk_docked') !== 'false'); // default docked
+const scale = ref(parseFloat(localStorage.getItem('osk_scale') || '1') || 1);
+const pos = ref((() => {
+  try { return JSON.parse(localStorage.getItem('osk_pos')) || { x: 60, y: 120 }; }
+  catch { return { x: 60, y: 120 }; }
+})());
+
+function savePrefs() {
+  localStorage.setItem('osk_docked', String(docked.value));
+  localStorage.setItem('osk_scale', String(scale.value));
+  localStorage.setItem('osk_pos', JSON.stringify(pos.value));
+}
+
+const floatStyle = computed(() => {
+  if (docked.value) return {};
+  return {
+    left: pos.value.x + 'px',
+    top: pos.value.y + 'px',
+    transform: `scale(${scale.value})`,
+    transformOrigin: 'top left',
+  };
+});
+// In docked mode let the keys grow/shrink with scale via font/height vars.
+const keysStyle = computed(() => docked.value ? { '--osk-k': (56 * scale.value) + 'px' } : {});
 
 const EN = [
   ['1','2','3','4','5','6','7','8','9','0'],
@@ -71,6 +110,52 @@ function display(k) {
   return k;
 }
 
+// --- Scale / dock controls ---
+function clampScale(v) { return Math.max(0.6, Math.min(1.6, Math.round(v * 10) / 10)); }
+function smaller() { scale.value = clampScale(scale.value - 0.1); applyDockPadding(); savePrefs(); }
+function bigger() { scale.value = clampScale(scale.value + 0.1); applyDockPadding(); savePrefs(); }
+function toggleDock() {
+  docked.value = !docked.value;
+  if (!docked.value) {
+    // Popping out: clear the body padding used by the docked bar.
+    document.body.style.paddingBottom = '';
+    // Make sure it's on-screen.
+    pos.value = {
+      x: Math.min(pos.value.x, window.innerWidth - 200),
+      y: Math.min(pos.value.y, window.innerHeight - 200),
+    };
+  } else {
+    nextTick(applyDockPadding);
+  }
+  savePrefs();
+}
+
+// --- Drag (pointer = mouse + touch). Ignore drags that start on a button. ---
+let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+function startDrag(e) {
+  if (docked.value) return;            // only draggable when floating
+  if (e.target.closest('button')) return;
+  dragging = true;
+  sx = e.clientX; sy = e.clientY; ox = pos.value.x; oy = pos.value.y;
+  window.addEventListener('pointermove', onDrag);
+  window.addEventListener('pointerup', endDrag);
+}
+function onDrag(e) {
+  if (!dragging) return;
+  const nx = ox + (e.clientX - sx);
+  const ny = oy + (e.clientY - sy);
+  pos.value = {
+    x: Math.max(0, Math.min(nx, window.innerWidth - 80)),
+    y: Math.max(0, Math.min(ny, window.innerHeight - 60)),
+  };
+}
+function endDrag() {
+  dragging = false;
+  window.removeEventListener('pointermove', onDrag);
+  window.removeEventListener('pointerup', endDrag);
+  savePrefs();
+}
+
 function isEditable(el) {
   if (!el) return false;
   const tag = el.tagName;
@@ -89,13 +174,18 @@ function onFocusIn(e) {
   }
 }
 
-function show() {
-  visible.value = true;
-  nextTick(() => {
+function applyDockPadding() {
+  if (docked.value && visible.value) {
     oskHeight.value = kb.value ? kb.value.offsetHeight : 0;
     document.body.style.paddingBottom = oskHeight.value + 'px';
-    scrollIntoView();
-  });
+  } else {
+    document.body.style.paddingBottom = '';
+  }
+}
+
+function show() {
+  visible.value = true;
+  nextTick(() => { applyDockPadding(); scrollIntoView(); });
 }
 function hide() {
   visible.value = false;
@@ -104,6 +194,7 @@ function hide() {
 function toggle() { visible.value ? hide() : show(); }
 
 function scrollIntoView() {
+  if (!docked.value) return; // floating keyboard can be moved out of the way
   try { lastFocused?.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch {}
 }
 
@@ -122,8 +213,8 @@ function press(k) {
     const s = el.selectionStart ?? el.value.length;
     const e = el.selectionEnd ?? el.value.length;
     el.value = el.value.slice(0, s) + ch + el.value.slice(e);
-    const pos = s + ch.length;
-    try { el.setSelectionRange(pos, pos); } catch {}
+    const pos2 = s + ch.length;
+    try { el.setSelectionRange(pos2, pos2); } catch {}
     el.dispatchEvent(new Event('input', { bubbles: true }));
   }
   el.focus();
@@ -159,7 +250,12 @@ function enter() {
 function toggleShift() { shift.value = !shift.value; }
 
 onMounted(() => document.addEventListener('focusin', onFocusIn));
-onBeforeUnmount(() => { document.removeEventListener('focusin', onFocusIn); document.body.style.paddingBottom = ''; });
+onBeforeUnmount(() => {
+  document.removeEventListener('focusin', onFocusIn);
+  document.body.style.paddingBottom = '';
+  window.removeEventListener('pointermove', onDrag);
+  window.removeEventListener('pointerup', endDrag);
+});
 </script>
 
 <style>
@@ -170,24 +266,32 @@ onBeforeUnmount(() => { document.removeEventListener('focusin', onFocusIn); docu
   box-shadow: 0 4px 14px rgba(0,0,0,.35); cursor: pointer;
 }
 .osk {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 2147482000;
   background: #1f2937; padding: 8px; box-shadow: 0 -6px 20px rgba(0,0,0,.4);
-  user-select: none;
+  user-select: none; z-index: 2147482000;
 }
-.osk-bar { display: flex; gap: 6px; margin-bottom: 6px; }
+/* Docked: full-width bar at the bottom */
+.osk-docked { position: fixed; left: 0; right: 0; bottom: 0; }
+/* Floating: positioned, draggable, scalable panel */
+.osk-floating {
+  position: fixed; width: 720px; max-width: 96vw;
+  border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.5);
+}
+.osk-bar { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; cursor: grab; }
+.osk-floating .osk-bar { cursor: grab; }
+.osk-grip { color: #9ca3af; font-size: 13px; padding: 0 6px; }
 .osk-tab {
-  min-width: 52px; height: 40px; border-radius: 8px; border: none;
+  min-width: 44px; height: 40px; border-radius: 8px; border: none;
   background: #374151; color: #e5e7eb; font-size: 16px; font-weight: 600; cursor: pointer;
 }
 .osk-tab.on { background: #D4A843; color: #1a1a1a; }
 .osk-row { display: flex; gap: 6px; justify-content: center; margin-bottom: 6px; }
 .osk-key {
-  flex: 1; max-width: 9%; height: 56px; border-radius: 8px; border: none;
+  flex: 1; max-width: 9%; height: var(--osk-k, 56px); border-radius: 8px; border: none;
   background: #374151; color: #fff; font-size: 20px; cursor: pointer;
 }
 .osk-key:active { background: #D4A843; color: #1a1a1a; }
 .osk-key.on { background: #D4A843; color: #1a1a1a; }
 .osk-fn { max-width: 14%; background: #4b5563; font-size: 22px; }
 .osk-space { max-width: 50%; }
-@media (max-width: 1100px) { .osk-key { height: 48px; font-size: 18px; } }
+@media (max-width: 1100px) { .osk-docked .osk-key { height: 48px; font-size: 18px; } }
 </style>
