@@ -73,7 +73,7 @@
               </div>
               <input v-model.number="line.quantity" type="number" min="1" class="col-span-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-sm" :placeholder="t('quantity') || 'Qty'" />
               <input v-model.number="line.unit_price" type="number" min="0" step="0.01" class="col-span-3 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-sm" :placeholder="t('price') || 'Price'" />
-              <button class="col-span-1 text-red-500 hover:text-red-700" @click="itemLines.splice(i, 1)">&times;</button>
+              <button class="col-span-1 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 text-2xl leading-none" @click="itemLines.splice(i, 1)">&times;</button>
             </div>
             <AppButton size="sm" variant="secondary" @click="addItemLine">+ {{ t('add') }}</AppButton>
           </div>

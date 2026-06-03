@@ -20,7 +20,7 @@
             <div class="flex items-center gap-1 flex-wrap text-sm">
               <button class="crumb" :class="catPath.length ? 'crumb-link' : 'crumb-cur'" @click="goToLevel(-1)">{{ t('all') }}</button>
               <template v-for="(c, i) in catPath" :key="c.uuid">
-                <span class="opacity-40">›</span>
+                <span class="opacity-40">{{ _isAr() ? '‹' : '›' }}</span>
                 <button class="crumb" :class="i === catPath.length - 1 ? 'crumb-cur' : 'crumb-link'" @click="goToLevel(i)">{{ catName(c) }}</button>
               </template>
             </div>
@@ -33,7 +33,7 @@
                 @click="drillInto(cat)"
               >
                 <span class="truncate">{{ catName(cat) }}</span>
-                <span v-if="hasChildren(cat)" class="cat-caret">›</span>
+                <span v-if="hasChildren(cat)" class="cat-caret">{{ _isAr() ? '‹' : '›' }}</span>
               </button>
             </div>
           </div>
@@ -239,7 +239,7 @@
                 />
               </div>
               <button
-                class="flex-shrink-0 w-10 h-10 rounded-lg bg-[#D4A843] text-gray-900 hover:bg-[#c49a3a] flex items-center justify-center transition-colors"
+                class="flex-shrink-0 w-12 h-12 rounded-lg bg-[#D4A843] text-gray-900 hover:bg-[#c49a3a] active:scale-95 flex items-center justify-center transition"
                 :title="t('add') + ' ' + t('customer')"
                 @click="showNewCustomerModal = true"
               >
@@ -309,14 +309,14 @@
               <!-- Payment Method Segmented Buttons -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ t('payment_method') }}</label>
-                <div class="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+                <div class="grid grid-cols-2 gap-2">
                   <button
                     v-for="method in paymentMethods"
                     :key="method.value"
-                    class="flex-1 px-3 py-2 text-sm font-medium transition-colors"
+                    class="rounded-lg border px-3 py-3 text-sm font-semibold transition-colors"
                     :class="paymentMethod === method.value
-                      ? 'bg-[#D4A843] text-gray-900'
-                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'"
+                      ? 'bg-[#D4A843] text-gray-900 border-[#D4A843]'
+                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'"
                     @click="paymentMethod = method.value"
                   >
                     {{ method.label }}
