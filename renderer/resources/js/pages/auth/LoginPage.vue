@@ -8,7 +8,7 @@
             <span class="text-2xl font-bold text-gray-900">VS</span>
           </div>
           <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Hisab</h1>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Hisab Inventory & Accounting</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ t('app_tagline') }}</p>
         </div>
 
         <!-- Error Message -->
@@ -94,11 +94,11 @@ async function handleLogin() {
   } catch (e) {
     if (e.response && e.response.status === 422) {
       const errors = e.response.data.errors;
-      error.value = errors ? Object.values(errors).flat().join(' ') : 'Invalid credentials.';
+      error.value = errors ? Object.values(errors).flat().join(' ') : t('invalid_credentials');
     } else if (e.response && e.response.status === 401) {
-      error.value = 'Invalid email or password.';
+      error.value = t('invalid_credentials');
     } else {
-      error.value = 'An error occurred. Please try again.';
+      error.value = t('login_error');
     }
   } finally {
     loading.value = false;
