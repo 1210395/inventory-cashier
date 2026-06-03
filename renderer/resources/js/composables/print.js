@@ -1,10 +1,32 @@
 // Print helper that renders a clean, standalone document in a new window —
 // produces an actual invoice/receipt, not a screenshot of the app page.
+// Documents are BILINGUAL: every label and product name shows English + Arabic.
+
+import enMsgs from '../i18n/en.js';
+import arMsgs from '../i18n/ar.js';
+
+const EN = enMsgs && enMsgs.default ? enMsgs.default : enMsgs;
+const AR = arMsgs && arMsgs.default ? arMsgs.default : arMsgs;
 
 function esc(v) {
   return String(v ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
+}
+
+// Bilingual label: "English / عربي" (or just one if they're identical/missing).
+function bi(key, fallback) {
+  const e = EN[key] || fallback || key;
+  const a = AR[key] || fallback || key;
+  return e === a ? esc(e) : `${esc(e)} <span dir="rtl">/ ${esc(a)}</span>`;
+}
+
+// Bilingual entity name from a record with name_en / name_ar.
+function nameBi(obj) {
+  const e = (obj && obj.name_en) || '';
+  const a = (obj && obj.name_ar) || '';
+  if (e && a) return `${esc(e)} <span dir="rtl">/ ${esc(a)}</span>`;
+  return esc(e || a || (obj && obj.name) || '-');
 }
 
 function openAndPrint(title, bodyHtml, widthCss) {
@@ -18,7 +40,7 @@ function openAndPrint(title, bodyHtml, widthCss) {
 <title>${esc(title)}</title>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: Arial, "Segoe UI", sans-serif; color: #111; margin: 0; padding: 16px; ${widthCss} }
+  body { font-family: Arial, "Segoe UI", "Tahoma", sans-serif; color: #111; margin: 0; padding: 16px; ${widthCss} }
   h1 { font-size: 20px; margin: 0 0 2px; }
   .muted { color: #666; }
   table { width: 100%; border-collapse: collapse; margin: 14px 0; }
@@ -39,12 +61,12 @@ function openAndPrint(title, bodyHtml, widthCss) {
   w.document.close();
 }
 
-// Full A4-style invoice. `fmt` is a currency formatter (number -> string).
-export function printInvoice({ invoice, settings, fmt, t, partyName, partyPhone }) {
+// Full A4-style invoice (bilingual). `fmt` is a currency formatter.
+export function printInvoice({ invoice, settings, fmt, partyName, partyPhone }) {
   const s = settings || {};
   const items = (invoice.items || []).map((it) => `
     <tr>
-      <td>${esc(it.product?.name_en || it.product?.name || it.product?.name_ar || '-')}</td>
+      <td>${nameBi(it.product)}</td>
       <td class="c">${esc(it.quantity)}</td>
       <td class="r">${esc(fmt(it.unit_price))}</td>
       <td class="r">${esc(fmt(it.total))}</td>
@@ -54,48 +76,48 @@ export function printInvoice({ invoice, settings, fmt, t, partyName, partyPhone 
   const body = `
     <div class="hdr">
       <div>
-        <div class="biz">${esc(s.business_name || 'Invoice')}</div>
+        <div class="biz">${esc(s.business_name || '')}</div>
         ${s.business_phone ? `<div class="muted">${esc(s.business_phone)}</div>` : ''}
         ${s.business_address ? `<div class="muted">${esc(s.business_address)}</div>` : ''}
-        ${s.tax_id ? `<div class="muted">${esc(t('tax_id') || 'Tax ID')}: ${esc(s.tax_id)}</div>` : ''}
+        ${s.tax_id ? `<div class="muted">${bi('tax_id', 'Tax ID')}: ${esc(s.tax_id)}</div>` : ''}
       </div>
       <div class="r">
-        <h1>${esc(t('invoice') || 'Invoice')}</h1>
+        <h1>${bi('invoice', 'Invoice')}</h1>
         <div class="muted">${esc(invoice.invoice_number)}</div>
         <div class="muted">${esc(invoice.created_at ? new Date(invoice.created_at).toLocaleDateString() : '')}</div>
       </div>
     </div>
     <div style="margin-bottom:8px;">
-      <strong>${esc(invoice.type === 'sale' ? (t('customer') || 'Customer') : (t('supplier') || 'Supplier'))}:</strong>
+      <strong>${invoice.type === 'sale' ? bi('customer', 'Customer') : bi('supplier', 'Supplier')}:</strong>
       ${esc(partyName || '-')}${partyPhone ? ' · ' + esc(partyPhone) : ''}
     </div>
     <table>
       <thead><tr>
-        <th>${esc(t('products') || 'Product')}</th>
-        <th class="c">${esc(t('quantity') || 'Qty')}</th>
-        <th class="r">${esc(t('unit_price') || 'Price')}</th>
-        <th class="r">${esc(t('total') || 'Total')}</th>
+        <th>${bi('products', 'Product')}</th>
+        <th class="c">${bi('quantity', 'Qty')}</th>
+        <th class="r">${bi('unit_price', 'Price')}</th>
+        <th class="r">${bi('total', 'Total')}</th>
       </tr></thead>
       <tbody>${items}</tbody>
     </table>
     <table class="totals">
-      <tr><td>${esc(t('subtotal') || 'Subtotal')}</td><td class="r">${esc(fmt(invoice.subtotal))}</td></tr>
-      ${invoice.tax_amount ? `<tr><td>${esc(t('tax') || 'Tax')}</td><td class="r">${esc(fmt(invoice.tax_amount))}</td></tr>` : ''}
-      ${invoice.discount_amount ? `<tr><td>${esc(t('discount') || 'Discount')}</td><td class="r">-${esc(fmt(invoice.discount_amount))}</td></tr>` : ''}
-      <tr class="grand"><td>${esc(t('total') || 'Total')}</td><td class="r">${esc(fmt(invoice.total))}</td></tr>
-      <tr><td>${esc(t('paid') || 'Paid')}</td><td class="r">${esc(fmt(invoice.paid_amount))}</td></tr>
-      <tr><td>${esc(t('remaining') || 'Remaining')}</td><td class="r">${esc(fmt(remaining))}</td></tr>
+      <tr><td>${bi('subtotal', 'Subtotal')}</td><td class="r">${esc(fmt(invoice.subtotal))}</td></tr>
+      ${invoice.tax_amount ? `<tr><td>${bi('tax', 'Tax')}</td><td class="r">${esc(fmt(invoice.tax_amount))}</td></tr>` : ''}
+      ${invoice.discount_amount ? `<tr><td>${bi('discount', 'Discount')}</td><td class="r">-${esc(fmt(invoice.discount_amount))}</td></tr>` : ''}
+      <tr class="grand"><td>${bi('total', 'Total')}</td><td class="r">${esc(fmt(invoice.total))}</td></tr>
+      <tr><td>${bi('paid', 'Paid')}</td><td class="r">${esc(fmt(invoice.paid_amount))}</td></tr>
+      <tr><td>${bi('remaining', 'Remaining')}</td><td class="r">${esc(fmt(remaining))}</td></tr>
     </table>
-    ${invoice.notes ? `<p class="muted">${esc(t('notes') || 'Notes')}: ${esc(invoice.notes)}</p>` : ''}
+    ${invoice.notes ? `<p class="muted">${bi('notes', 'Notes')}: ${esc(invoice.notes)}</p>` : ''}
   `;
-  openAndPrint(invoice.invoice_number || (t('invoice') || 'Invoice'), body, 'max-width: 800px; margin: 0 auto;');
+  openAndPrint(invoice.invoice_number || 'Invoice', body, 'max-width: 800px; margin: 0 auto;');
 }
 
-// Barcode label sheet — a clean printable document (not a page screenshot).
-export function printLabels({ products, fmt, t }) {
+// Barcode label sheet (bilingual product name).
+export function printLabels({ products, fmt }) {
   const cards = (products || []).map((p) => `
     <div class="label">
-      <div class="name">${esc(p.name_en || p.name || p.name_ar || '-')}</div>
+      <div class="name">${nameBi(p)}</div>
       ${p.barcode ? `<div class="code">${esc(p.barcode)}</div>` : ''}
       ${p.sku ? `<div class="sku">SKU: ${esc(p.sku)}</div>` : ''}
       <div class="price">${esc(fmt(p.sell_price))}</div>
@@ -112,20 +134,20 @@ export function printLabels({ products, fmt, t }) {
       .price { font-size: 13px; margin-top: 4px; }
     </style>
     <div class="sheet">${cards}</div>`;
-  openAndPrint(t('print_labels') || 'Labels', body, 'max-width: 800px; margin: 0 auto;');
+  openAndPrint('Labels', body, 'max-width: 800px; margin: 0 auto;');
 }
 
-// 80mm thermal receipt for POS sales.
-export function printReceipt({ lines, settings, fmt, t, totals, paymentMethod }) {
+// 80mm thermal receipt for POS sales (bilingual labels + product names).
+export function printReceipt({ lines, settings, fmt, totals, paymentMethod }) {
   const s = settings || {};
   const rows = (lines || []).map((it) => `
     <tr>
-      <td>${esc(it.name)}<div class="muted" style="font-size:11px;">${esc(it.quantity)} × ${esc(fmt(it.unit_price))}</div></td>
+      <td>${(it.name_en || it.name_ar) ? nameBi(it) : esc(it.name)}<div class="muted" style="font-size:11px;">${esc(it.quantity)} × ${esc(fmt(it.unit_price))}</div></td>
       <td class="r">${esc(fmt(it.line_total))}</td>
     </tr>`).join('');
   const body = `
     <div style="text-align:center;margin-bottom:6px;">
-      <div class="biz">${esc(s.business_name || 'Receipt')}</div>
+      <div class="biz">${esc(s.business_name || '')}</div>
       ${s.business_phone ? `<div class="muted" style="font-size:11px;">${esc(s.business_phone)}</div>` : ''}
       ${s.business_address ? `<div class="muted" style="font-size:11px;">${esc(s.business_address)}</div>` : ''}
       <div class="muted" style="font-size:11px;">${esc(new Date().toLocaleString())}</div>
@@ -134,13 +156,13 @@ export function printReceipt({ lines, settings, fmt, t, totals, paymentMethod })
       <tbody>${rows}</tbody>
     </table>
     <table class="totals" style="width:100%;">
-      <tr><td>${esc(t('subtotal') || 'Subtotal')}</td><td class="r">${esc(fmt(totals.subtotal))}</td></tr>
-      ${totals.discount ? `<tr><td>${esc(t('discount') || 'Discount')}</td><td class="r">-${esc(fmt(totals.discount))}</td></tr>` : ''}
-      ${totals.tax ? `<tr><td>${esc(t('tax') || 'Tax')}</td><td class="r">${esc(fmt(totals.tax))}</td></tr>` : ''}
-      <tr class="grand"><td>${esc(t('total') || 'Total')}</td><td class="r">${esc(fmt(totals.total))}</td></tr>
-      ${paymentMethod ? `<tr><td>${esc(t('payment_method') || 'Payment')}</td><td class="r">${esc(t(paymentMethod) || paymentMethod)}</td></tr>` : ''}
+      <tr><td>${bi('subtotal', 'Subtotal')}</td><td class="r">${esc(fmt(totals.subtotal))}</td></tr>
+      ${totals.discount ? `<tr><td>${bi('discount', 'Discount')}</td><td class="r">-${esc(fmt(totals.discount))}</td></tr>` : ''}
+      ${totals.tax ? `<tr><td>${bi('tax', 'Tax')}</td><td class="r">${esc(fmt(totals.tax))}</td></tr>` : ''}
+      <tr class="grand"><td>${bi('total', 'Total')}</td><td class="r">${esc(fmt(totals.total))}</td></tr>
+      ${paymentMethod ? `<tr><td>${bi('payment_method', 'Payment')}</td><td class="r">${bi(paymentMethod, paymentMethod)}</td></tr>` : ''}
     </table>
-    <p style="text-align:center;font-size:12px;margin-top:10px;">${esc(t('thank_you') || 'Thank you!')}</p>
+    <p style="text-align:center;font-size:12px;margin-top:10px;">${bi('thank_you', 'Thank you!')}</p>
   `;
-  openAndPrint(t('receipt') || 'Receipt', body, 'max-width: 280px; margin: 0 auto;');
+  openAndPrint('Receipt', body, 'max-width: 280px; margin: 0 auto;');
 }

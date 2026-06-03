@@ -268,6 +268,7 @@ export default {
   tables: 'Tables',
   transfer: 'Transfer',
   transfer_to: 'Transfer to table',
+  name_required_either: 'Enter a name in English or Arabic (one is enough)',
   invalid_credentials: 'Invalid email or password',
   login_error: 'An error occurred. Please try again.',
   app_tagline: 'Inventory & Accounting',

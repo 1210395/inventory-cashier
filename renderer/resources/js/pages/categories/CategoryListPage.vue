@@ -36,8 +36,8 @@
               </button>
               <span v-else class="w-6"></span>
               <div>
-                <p class="text-sm font-medium text-gray-900 dark:text-white">{{ cat.name_en }}</p>
-                <p v-if="cat.name_ar" class="text-xs text-gray-400 dark:text-gray-500">{{ cat.name_ar }}</p>
+                <p class="text-sm font-medium text-gray-900 dark:text-white">{{ cat.name_en || cat.name_ar }}</p>
+                <p v-if="cat.name_ar && cat.name_en" class="text-xs text-gray-400 dark:text-gray-500">{{ cat.name_ar }}</p>
               </div>
             </div>
             <div class="flex items-center gap-3">
@@ -65,8 +65,8 @@
               <div class="flex items-center gap-3 pl-9">
                 <div class="w-4 border-l-2 border-b-2 border-gray-300 dark:border-gray-600 h-4 -mt-2 rounded-bl-sm"></div>
                 <div>
-                  <p class="text-sm font-medium text-gray-900 dark:text-white">{{ child.name_en }}</p>
-                  <p v-if="child.name_ar" class="text-xs text-gray-400 dark:text-gray-500">{{ child.name_ar }}</p>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">{{ child.name_en || child.name_ar }}</p>
+                  <p v-if="child.name_ar && child.name_en" class="text-xs text-gray-400 dark:text-gray-500">{{ child.name_ar }}</p>
                 </div>
               </div>
               <div class="flex items-center gap-3">
@@ -106,7 +106,6 @@
             :label="t('name_en')"
             :placeholder="t('name_en')"
             :error="formErrors.name_en"
-            required
           />
           <AppInput
             v-model="form.name_ar"
@@ -114,6 +113,7 @@
             :placeholder="t('name_ar')"
             :error="formErrors.name_ar"
           />
+          <p class="text-xs text-gray-400 -mt-2">{{ t('name_required_either') || 'Enter a name in English or Arabic (one is enough).' }}</p>
           <AppSelect
             v-model="form.parent_uuid"
             :label="t('parent_category')"
@@ -175,7 +175,7 @@ const parentOptions = computed(() => {
   // Only top-level categories (no parent) can be parents
   return flatCategories.value
     .filter((c) => !c.parent_uuid && (!editingItem.value || c.uuid !== editingItem.value.uuid))
-    .map((c) => ({ value: c.uuid, label: c.name_en }));
+    .map((c) => ({ value: c.uuid, label: c.name_en || c.name_ar }));
 });
 
 function toggleExpand(uuid) {
@@ -205,7 +205,7 @@ function confirmDelete(item) {
 
 async function submitForm() {
   const e = {};
-  if (!form.value.name_en) e.name_en = 'Required';
+  if (!form.value.name_en && !form.value.name_ar) e.name_en = t('name_required_either') || 'Enter a name (English or Arabic)';
   formErrors.value = e;
   if (Object.keys(e).length > 0) return;
 

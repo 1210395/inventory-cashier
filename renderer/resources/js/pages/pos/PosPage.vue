@@ -709,6 +709,8 @@ function addToCart(product) {
     cart.value.push({
       product_uuid: product.uuid,
       product_name: catName(product) || product.name_en || product.name,
+      name_en: product.name_en || '',
+      name_ar: product.name_ar || '',
       sku: product.sku || '',
       unit_price: parseFloat(product.sell_price) || 0,
       quantity: 1,
@@ -842,6 +844,8 @@ async function completeSale() {
     receiptData.paid = paidAmount.value;
     receiptData.lines = cart.value.map((it) => ({
       name: it.product_name,
+      name_en: it.name_en,
+      name_ar: it.name_ar,
       quantity: it.quantity,
       unit_price: it.unit_price,
       line_total: it.line_total,

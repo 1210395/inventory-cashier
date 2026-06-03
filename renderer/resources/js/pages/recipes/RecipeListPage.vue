@@ -38,8 +38,8 @@
               class="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
             >
               <td class="px-4 py-3">
-                <p class="font-medium text-gray-900 dark:text-white">{{ recipe.name_en }}</p>
-                <p v-if="recipe.name_ar" class="text-xs text-gray-400">{{ recipe.name_ar }}</p>
+                <p class="font-medium text-gray-900 dark:text-white">{{ recipe.name_en || recipe.name_ar }}</p>
+                <p v-if="recipe.name_ar && recipe.name_en" class="text-xs text-gray-400">{{ recipe.name_ar }}</p>
               </td>
               <td class="px-4 py-3">
                 <button
@@ -111,7 +111,7 @@
       <AppModal :show="showModal" :title="editingRecipe ? t('edit') + ' ' + t('recipe') : t('add') + ' ' + t('recipe')" size="lg" @close="closeModal">
         <div class="space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <AppInput v-model="form.name_en" :label="t('name_en')" :placeholder="t('name_en')" required />
+            <AppInput v-model="form.name_en" :label="t('name_en')" :placeholder="t('name_en')" />
             <AppInput v-model="form.name_ar" :label="t('name_ar')" :placeholder="t('name_ar')" />
           </div>
 
@@ -319,7 +319,7 @@ function closeModal() {
 }
 
 async function saveRecipe() {
-  if (!form.name_en) return;
+  if (!form.name_en && !form.name_ar) { error.value = t('name_required_either') || 'Enter a name (English or Arabic).'; return; }
   saving.value = true;
   error.value = '';
   try {

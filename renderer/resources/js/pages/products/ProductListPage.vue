@@ -47,7 +47,7 @@
             : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
           @click="selectedCategoryUuid = selectedCategoryUuid === cat.uuid ? '' : cat.uuid"
         >
-          {{ cat.name_en }}
+          {{ cat.name_en || cat.name_ar }}
         </button>
       </div>
 
@@ -123,7 +123,7 @@
               class="text-[#D4A843] hover:underline font-medium text-left"
               @click="$router.push('/products/' + item.uuid)"
             >
-              {{ item.name_en }}
+              {{ item.name_en || item.name_ar }}
             </button>
           </div>
         </template>
@@ -135,7 +135,7 @@
               :key="cat.uuid"
               class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#D4A843]/15 text-[#D4A843] dark:bg-[#D4A843]/25 dark:text-[#D4A843]"
             >
-              {{ cat.name_en }}
+              {{ cat.name_en || cat.name_ar }}
             </span>
             <span v-if="!(item.categories?.length || item.category)" class="text-gray-400">-</span>
           </div>
