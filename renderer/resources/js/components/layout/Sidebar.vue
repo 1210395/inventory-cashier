@@ -5,9 +5,7 @@
   >
     <!-- Branding -->
     <div class="flex items-center gap-3 py-5 border-b border-gray-700" :class="sidebarOpen ? 'px-5' : 'px-0 justify-center'">
-      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-yellow-500 to-yellow-600 flex items-center justify-center flex-shrink-0">
-        <span class="text-sm font-bold text-gray-900">VS</span>
-      </div>
+      <img :src="logo" alt="Hisab" class="w-9 h-9 rounded-lg flex-shrink-0" />
       <span v-show="sidebarOpen" class="text-lg font-bold text-yellow-500 tracking-wide">Hisab</span>
     </div>
 
@@ -81,6 +79,7 @@ import { useAuthStore } from '../../stores/auth.js';
 import { useUiStore } from '../../stores/ui.js';
 import { t } from '../../i18n/index.js';
 import NavItem from './NavItem.vue';
+import logo from '../../assets/logo.png';
 
 const auth = useAuthStore();
 const ui = useUiStore();

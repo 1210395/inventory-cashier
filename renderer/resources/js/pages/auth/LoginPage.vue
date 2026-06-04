@@ -4,9 +4,7 @@
       <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8">
         <!-- Logo / Title -->
         <div class="text-center mb-8">
-          <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-yellow-500 to-yellow-600 mb-4">
-            <span class="text-2xl font-bold text-gray-900">VS</span>
-          </div>
+          <img :src="logo" alt="Hisab" class="mx-auto block w-16 h-16 rounded-2xl mb-4" />
           <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Hisab</h1>
           <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ t('app_tagline') }}</p>
         </div>
@@ -73,6 +71,7 @@
 
 <script setup>
 import { ref } from 'vue';
+import logo from '../../assets/logo.png';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth.js';
 import { t } from '../../i18n/index.js';
