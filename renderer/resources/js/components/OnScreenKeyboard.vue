@@ -144,14 +144,21 @@ function toggleDock() {
 }
 
 // --- Drag (pointer = mouse + touch). Ignore drags that start on a button. ---
-let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+// Pointer capture + touch-action:none (in CSS) keep the drag continuous on
+// touchscreens, where the browser would otherwise hijack the gesture for
+// scrolling and cancel the pointer stream mid-drag (the "stutter" bug).
+let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0, dragEl = null, dragId = null;
 function startDrag(e) {
   if (docked.value) return;            // only draggable when floating
   if (e.target.closest('button')) return;
   dragging = true;
   sx = e.clientX; sy = e.clientY; ox = pos.value.x; oy = pos.value.y;
-  window.addEventListener('pointermove', onDrag);
-  window.addEventListener('pointerup', endDrag);
+  dragEl = e.currentTarget; dragId = e.pointerId;
+  try { dragEl.setPointerCapture(dragId); } catch {}
+  // Listen on the captured element so every move/up for this pointer is ours.
+  dragEl.addEventListener('pointermove', onDrag);
+  dragEl.addEventListener('pointerup', endDrag);
+  dragEl.addEventListener('pointercancel', endDrag);
 }
 function onDrag(e) {
   if (!dragging) return;
@@ -164,8 +171,13 @@ function onDrag(e) {
 }
 function endDrag() {
   dragging = false;
-  window.removeEventListener('pointermove', onDrag);
-  window.removeEventListener('pointerup', endDrag);
+  if (dragEl) {
+    try { dragEl.releasePointerCapture(dragId); } catch {}
+    dragEl.removeEventListener('pointermove', onDrag);
+    dragEl.removeEventListener('pointerup', endDrag);
+    dragEl.removeEventListener('pointercancel', endDrag);
+    dragEl = null; dragId = null;
+  }
   savePrefs();
 }
 
@@ -271,8 +283,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('focusin', onFocusIn);
   document.body.style.paddingBottom = '';
   document.documentElement.style.setProperty('--osk-height', '0px');
-  window.removeEventListener('pointermove', onDrag);
-  window.removeEventListener('pointerup', endDrag);
+  if (dragging) endDrag();
 });
 </script>
 
@@ -294,7 +305,7 @@ onBeforeUnmount(() => {
   position: fixed; width: 720px; max-width: 96vw;
   border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.5);
 }
-.osk-bar { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; cursor: grab; }
+.osk-bar { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; cursor: grab; touch-action: none; }
 .osk-floating .osk-bar { cursor: grab; }
 .osk-grip { color: #9ca3af; font-size: 13px; padding: 0 6px; }
 .osk-tab {

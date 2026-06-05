@@ -856,9 +856,14 @@ async function completeSale() {
     receiptData.payment_method = paymentMethod.value;
     showReceiptModal.value = true;
 
-    // Cashier terminal: kick the cash drawer on cash sales (Electron only).
+    // Cashier terminal: kick the cash drawer on cash sales (Electron only),
+    // unless the operator turned "open drawer on sale" off in Settings.
     if (paymentMethod.value === 'cash' && typeof window !== 'undefined' && window.cashier) {
-      try { window.cashier.openDrawer(); } catch (e) { /* noop */ }
+      try {
+        let kick = true;
+        try { const s = await window.cashier.getSettings(); if (s && s.openDrawerOnSale === false) kick = false; } catch (e) { /* default to kicking */ }
+        if (kick) window.cashier.openDrawer();
+      } catch (e) { /* noop */ }
     }
   } catch (e) {
     error.value = e.response?.data?.message || 'Failed to complete sale.';
