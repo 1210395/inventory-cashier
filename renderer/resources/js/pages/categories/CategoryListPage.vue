@@ -36,7 +36,7 @@
               </button>
               <span v-else class="w-6"></span>
               <div>
-                <p class="text-sm font-medium text-gray-900 dark:text-white">{{ cat.name_en || cat.name_ar }}</p>
+                <p class="text-sm font-medium text-gray-900 dark:text-white">{{ localizedName(cat) }}</p>
                 <p v-if="cat.name_ar && cat.name_en" class="text-xs text-gray-400 dark:text-gray-500">{{ cat.name_ar }}</p>
               </div>
             </div>
@@ -65,7 +65,7 @@
               <div class="flex items-center gap-3 pl-9">
                 <div class="w-4 border-l-2 border-b-2 border-gray-300 dark:border-gray-600 h-4 -mt-2 rounded-bl-sm"></div>
                 <div>
-                  <p class="text-sm font-medium text-gray-900 dark:text-white">{{ child.name_en || child.name_ar }}</p>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">{{ localizedName(child) }}</p>
                   <p v-if="child.name_ar && child.name_en" class="text-xs text-gray-400 dark:text-gray-500">{{ child.name_ar }}</p>
                 </div>
               </div>
@@ -142,7 +142,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import api from '../../composables/useApi.js';
-import { t } from '../../i18n/index.js';
+import { t, localizedName } from '../../i18n/index.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
 import AppButton from '../../components/base/AppButton.vue';
 import AppInput from '../../components/base/AppInput.vue';
@@ -175,7 +175,7 @@ const parentOptions = computed(() => {
   // Only top-level categories (no parent) can be parents
   return flatCategories.value
     .filter((c) => !c.parent_uuid && (!editingItem.value || c.uuid !== editingItem.value.uuid))
-    .map((c) => ({ value: c.uuid, label: c.name_en || c.name_ar }));
+    .map((c) => ({ value: c.uuid, label: localizedName(c) }));
 });
 
 function toggleExpand(uuid) {

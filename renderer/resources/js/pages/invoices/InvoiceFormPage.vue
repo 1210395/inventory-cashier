@@ -279,7 +279,7 @@
 import { ref, computed, reactive, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import api from '../../composables/useApi.js';
-import { t } from '../../i18n/index.js';
+import { t, localizedName } from '../../i18n/index.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
 import AppButton from '../../components/base/AppButton.vue';
 import AppBadge from '../../components/base/AppBadge.vue';
@@ -337,7 +337,7 @@ const newProduct = reactive({
 const productOptions = computed(() =>
   products.value.map((p) => ({
     value: p.uuid,
-    label: `${p.name_en || p.name} (${p.sku || '-'})`,
+    label: `${localizedName(p) || p.name} (${p.sku || '-'})`,
   }))
 );
 

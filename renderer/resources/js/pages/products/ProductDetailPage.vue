@@ -40,8 +40,8 @@
               <img :src="product.image" class="w-full h-full object-cover" />
             </div>
             <div>
-              <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ product.name_en }}</h2>
-              <p v-if="product.name_ar" class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ product.name_ar }}</p>
+              <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ localizedName(product) }}</h2>
+              <p v-if="(isRtl ? product.name_en : product.name_ar)" class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ isRtl ? product.name_en : product.name_ar }}</p>
             </div>
           </div>
         </div>
@@ -67,7 +67,7 @@
                     :key="cat.uuid"
                     class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#D4A843]/15 text-[#D4A843] dark:bg-[#D4A843]/25 dark:text-[#D4A843]"
                   >
-                    {{ cat.name_en }}
+                    {{ localizedName(cat) }}
                   </span>
                   <span v-if="!(product.categories?.length || product.category)" class="text-sm text-gray-400">-</span>
                 </dd>
@@ -216,7 +216,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '../../composables/useApi.js';
-import { t } from '../../i18n/index.js';
+import { t, localizedName, isRtl } from '../../i18n/index.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
 import AppButton from '../../components/base/AppButton.vue';
 import AppBadge from '../../components/base/AppBadge.vue';

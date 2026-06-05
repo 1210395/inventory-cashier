@@ -4,6 +4,7 @@
       <div
         v-if="show"
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        :style="{ paddingBottom: 'calc(1rem + var(--osk-height, 0px))' }"
       >
         <!-- Backdrop -->
         <div
@@ -11,10 +12,12 @@
           @click="$emit('close')"
         />
 
-        <!-- Modal panel -->
+        <!-- Modal panel: caps its height to the space above the on-screen
+             keyboard (--osk-height) so its fields/footer never hide behind it. -->
         <div
           :class="sizeClasses[size]"
-          class="relative w-full bg-white dark:bg-gray-800 rounded-xl shadow-2xl transform transition-all max-h-[90vh] flex flex-col"
+          class="relative w-full bg-white dark:bg-gray-800 rounded-xl shadow-2xl transform transition-all flex flex-col"
+          :style="{ maxHeight: 'calc(100vh - 2rem - var(--osk-height, 0px))' }"
         >
           <!-- Header -->
           <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">

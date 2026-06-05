@@ -50,7 +50,7 @@
               </thead>
               <tbody>
                 <tr v-for="p in filteredCountProducts" :key="p.uuid" class="border-b border-gray-100 dark:border-gray-700/50">
-                  <td class="px-3 py-2 text-gray-900 dark:text-white font-medium">{{ p.name_en || p.name_ar || '-' }}</td>
+                  <td class="px-3 py-2 text-gray-900 dark:text-white font-medium">{{ localizedName(p) || '-' }}</td>
                   <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ p.sku || '-' }}</td>
                   <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ p.quantity ?? 0 }}</td>
                   <td class="px-3 py-2">
@@ -116,12 +116,12 @@
                   class="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                   @click="selectProduct(p)"
                 >
-                  {{ p.name_en || p.name }} <span class="text-gray-400 text-xs">({{ t('stock') }}: {{ p.quantity ?? '-' }})</span>
+                  {{ localizedName(p) || p.name }} <span class="text-gray-400 text-xs">({{ t('stock') }}: {{ p.quantity ?? '-' }})</span>
                 </button>
               </div>
               <p v-if="formErrors.product_uuid" class="mt-1 text-sm text-red-500">{{ formErrors.product_uuid }}</p>
               <p v-if="selectedProduct" class="mt-1 text-xs text-[#D4A843]">
-                {{ t('selected') || 'Selected' }}: {{ selectedProduct.name_en || selectedProduct.name }}
+                {{ t('selected') || 'Selected' }}: {{ localizedName(selectedProduct) || selectedProduct.name }}
               </p>
             </div>
 
@@ -199,7 +199,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import api from '../../composables/useApi.js';
-import { t } from '../../i18n/index.js';
+import { t, localizedName } from '../../i18n/index.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
 import AppButton from '../../components/base/AppButton.vue';
 import AppInput from '../../components/base/AppInput.vue';

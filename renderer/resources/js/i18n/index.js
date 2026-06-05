@@ -20,4 +20,13 @@ function setLocale(loc) {
   document.documentElement.dir = loc === 'ar' ? 'rtl' : 'ltr';
 }
 
-export { locale, t, setLocale, isRtl };
+// Locale-aware display name for bilingual records (categories, products, recipes):
+// shows the current language's name, falling back to the other if it's missing.
+function localizedName(obj) {
+  if (!obj) return '';
+  const ar = obj.name_ar || '';
+  const en = obj.name_en || '';
+  return locale.value === 'ar' ? (ar || en || obj.name || '') : (en || ar || obj.name || '');
+}
+
+export { locale, t, setLocale, isRtl, localizedName };

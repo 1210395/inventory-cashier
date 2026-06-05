@@ -39,7 +39,7 @@
             class="text-[#D4A843] hover:underline font-medium text-left"
             @click="$router.push('/products/' + item.uuid)"
           >
-            {{ item.name_en || item.name || item.product_name || '-' }}
+            {{ localizedName(item) || item.name || item.product_name || '-' }}
           </button>
         </template>
         <template #cell-quantity="{ item }">
@@ -75,7 +75,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import api from '../../composables/useApi.js';
-import { t } from '../../i18n/index.js';
+import { t, localizedName } from '../../i18n/index.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
 import AppDataTable from '../../components/base/AppDataTable.vue';
 import AppBadge from '../../components/base/AppBadge.vue';

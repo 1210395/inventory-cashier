@@ -27,28 +27,9 @@
         <AppButton size="sm" variant="danger" @click="bulkDelete">{{ t('bulk_delete') }}</AppButton>
       </div>
 
-      <!-- Category filter bar -->
-      <div class="mb-4 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
-        <button
-          class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
-          :class="!selectedCategoryUuid
-            ? 'bg-[#D4A843] text-gray-900'
-            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
-          @click="selectedCategoryUuid = ''"
-        >
-          {{ t('all') }}
-        </button>
-        <button
-          v-for="cat in allCategories"
-          :key="cat.uuid"
-          class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
-          :class="selectedCategoryUuid === cat.uuid
-            ? 'bg-[#D4A843] text-gray-900'
-            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
-          @click="selectedCategoryUuid = selectedCategoryUuid === cat.uuid ? '' : cat.uuid"
-        >
-          {{ cat.name_en || cat.name_ar }}
-        </button>
+      <!-- Category filter: POS-style drill-down (breadcrumb + tap to go deeper) -->
+      <div class="mb-4">
+        <CategoryFilter :categories="allCategories" v-model="selectedCategoryUuids" />
       </div>
 
       <!-- Search bar + Low Stock toggle + Sort -->
@@ -123,7 +104,7 @@
               class="text-[#D4A843] hover:underline font-medium text-left"
               @click="$router.push('/products/' + item.uuid)"
             >
-              {{ item.name_en || item.name_ar }}
+              {{ localizedName(item) }}
             </button>
           </div>
         </template>
@@ -135,7 +116,7 @@
               :key="cat.uuid"
               class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#D4A843]/15 text-[#D4A843] dark:bg-[#D4A843]/25 dark:text-[#D4A843]"
             >
-              {{ cat.name_en || cat.name_ar }}
+              {{ localizedName(cat) }}
             </span>
             <span v-if="!(item.categories?.length || item.category)" class="text-gray-400">-</span>
           </div>
@@ -270,7 +251,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import api from '../../composables/useApi.js';
-import { t } from '../../i18n/index.js';
+import { t, localizedName } from '../../i18n/index.js';
 import { printLabels } from '../../composables/print.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
 import AppButton from '../../components/base/AppButton.vue';
@@ -278,13 +259,16 @@ import AppBadge from '../../components/base/AppBadge.vue';
 import AppDataTable from '../../components/base/AppDataTable.vue';
 import AppModal from '../../components/base/AppModal.vue';
 import AppInput from '../../components/base/AppInput.vue';
+import CategoryFilter from '../../components/base/CategoryFilter.vue';
 
 const router = useRouter();
 const route = useRoute();
 
 const products = ref([]);
 const allCategories = ref([]);
-const selectedCategoryUuid = ref('');
+// Effective category uuids from the drill-down filter (selected + descendants);
+// empty array means "All".
+const selectedCategoryUuids = ref([]);
 const loading = ref(true);
 const error = ref('');
 const search = ref('');
@@ -398,16 +382,18 @@ const filteredProducts = computed(() => {
   if (lowStockFilter.value) {
     result = result.filter((p) => (p.quantity ?? 0) <= (p.min_quantity ?? 0));
   }
-  if (selectedCategoryUuid.value) {
+  if (selectedCategoryUuids.value.length) {
+    const set = new Set(selectedCategoryUuids.value);
     result = result.filter((p) => {
       const cats = p.categories || (p.category ? [p.category] : []);
-      return cats.some((c) => c.uuid === selectedCategoryUuid.value);
+      return cats.some((c) => set.has(c.uuid));
     });
   }
   if (search.value) {
     const q = search.value.toLowerCase();
     result = result.filter((p) =>
       (p.name_en || '').toLowerCase().includes(q) ||
+      (p.name_ar || '').toLowerCase().includes(q) ||
       (p.sku || '').toLowerCase().includes(q) ||
       (p.barcode || '').toLowerCase().includes(q)
     );
@@ -418,8 +404,8 @@ const filteredProducts = computed(() => {
 const sortedProducts = computed(() => {
   const list = [...filteredProducts.value];
   switch (sortOption.value) {
-    case 'name_asc': return list.sort((a, b) => (a.name_en || '').localeCompare(b.name_en || ''));
-    case 'name_desc': return list.sort((a, b) => (b.name_en || '').localeCompare(a.name_en || ''));
+    case 'name_asc': return list.sort((a, b) => localizedName(a).localeCompare(localizedName(b)));
+    case 'name_desc': return list.sort((a, b) => localizedName(b).localeCompare(localizedName(a)));
     case 'price_asc': return list.sort((a, b) => (parseFloat(a.sell_price) || 0) - (parseFloat(b.sell_price) || 0));
     case 'price_desc': return list.sort((a, b) => (parseFloat(b.sell_price) || 0) - (parseFloat(a.sell_price) || 0));
     case 'qty_asc': return list.sort((a, b) => (a.quantity || 0) - (b.quantity || 0));

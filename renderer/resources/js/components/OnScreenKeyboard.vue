@@ -84,18 +84,27 @@ const floatStyle = computed(() => {
 // In docked mode let the keys grow/shrink with scale via font/height vars.
 const keysStyle = computed(() => docked.value ? { '--osk-k': (56 * scale.value) + 'px' } : {});
 
+// US English (ANSI) — number row on top, then the QWERTY rows, matching a
+// physical keyboard so numbers/symbols are exactly where the user expects.
 const EN = [
-  ['1','2','3','4','5','6','7','8','9','0'],
+  ['1','2','3','4','5','6','7','8','9','0','-','='],
   ['q','w','e','r','t','y','u','i','o','p'],
   ['a','s','d','f','g','h','j','k','l'],
-  ['z','x','c','v','b','n','m','-','@','.'],
+  ['z','x','c','v','b','n','m',',','.','/'],
 ];
+// Shifted faces for the number row + punctuation (US layout).
+const EN_SHIFT = {
+  '1':'!','2':'@','3':'#','4':'$','5':'%','6':'^','7':'&','8':'*','9':'(','0':')','-':'_','=':'+',
+  ',':'<','.':'>','/':'?',
+};
+// Arabic 101 — same digit row on top, then the standard Arabic 101 letter rows.
 const AR = [
-  ['1','2','3','4','5','6','7','8','9','0'],
+  ['1','2','3','4','5','6','7','8','9','0','-','='],
   ['ض','ص','ث','ق','ف','غ','ع','ه','خ','ح','ج'],
   ['ش','س','ي','ب','ل','ا','ت','ن','م','ك','ط'],
   ['ئ','ء','ؤ','ر','ى','ة','و','ز','ظ','د','ذ'],
 ];
+// Full numeric keypad (calculator-style) for fast price/quantity entry.
 const NUM = [
   ['7','8','9'],
   ['4','5','6'],
@@ -106,7 +115,10 @@ const NUM = [
 const rows = computed(() => (layout.value === 'ar' ? AR : layout.value === 'num' ? NUM : EN));
 
 function display(k) {
-  if (layout.value === 'en' && shift.value && /[a-z]/.test(k)) return k.toUpperCase();
+  if (layout.value === 'en' && shift.value) {
+    if (/[a-z]/.test(k)) return k.toUpperCase();
+    if (EN_SHIFT[k]) return EN_SHIFT[k];
+  }
   return k;
 }
 
@@ -119,6 +131,7 @@ function toggleDock() {
   if (!docked.value) {
     // Popping out: clear the body padding used by the docked bar.
     document.body.style.paddingBottom = '';
+    document.documentElement.style.setProperty('--osk-height', '0px');
     // Make sure it's on-screen.
     pos.value = {
       x: Math.min(pos.value.x, window.innerWidth - 200),
@@ -178,8 +191,11 @@ function applyDockPadding() {
   if (docked.value && visible.value) {
     oskHeight.value = kb.value ? kb.value.offsetHeight : 0;
     document.body.style.paddingBottom = oskHeight.value + 'px';
+    // Tell keyboard-aware overlays (modals) how much bottom space to reserve.
+    document.documentElement.style.setProperty('--osk-height', oskHeight.value + 'px');
   } else {
     document.body.style.paddingBottom = '';
+    document.documentElement.style.setProperty('--osk-height', '0px');
   }
 }
 
@@ -190,6 +206,7 @@ function show() {
 function hide() {
   visible.value = false;
   document.body.style.paddingBottom = '';
+  document.documentElement.style.setProperty('--osk-height', '0px');
 }
 function toggle() { visible.value ? hide() : show(); }
 
@@ -253,6 +270,7 @@ onMounted(() => document.addEventListener('focusin', onFocusIn));
 onBeforeUnmount(() => {
   document.removeEventListener('focusin', onFocusIn);
   document.body.style.paddingBottom = '';
+  document.documentElement.style.setProperty('--osk-height', '0px');
   window.removeEventListener('pointermove', onDrag);
   window.removeEventListener('pointerup', endDrag);
 });

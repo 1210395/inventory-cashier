@@ -70,7 +70,7 @@
             </thead>
             <tbody>
               <tr v-for="p in expiringProducts" :key="p.uuid" class="border-b border-gray-100 dark:border-gray-700/50">
-                <td class="px-4 py-2 text-gray-900 dark:text-white font-medium">{{ p.name_en || p.name_ar || '-' }}</td>
+                <td class="px-4 py-2 text-gray-900 dark:text-white font-medium">{{ localizedName(p) || '-' }}</td>
                 <td class="px-4 py-2 text-gray-500 dark:text-gray-400">{{ p.sku || '-' }}</td>
                 <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ p.expiry_date }}</td>
                 <td class="px-4 py-2">
@@ -113,7 +113,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import api from '../../composables/useApi.js';
-import { t } from '../../i18n/index.js';
+import { t, localizedName } from '../../i18n/index.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
 
 const loading = ref(true);
