@@ -19,6 +19,7 @@
     <div class="osk-bar" @pointerdown="startDrag">
       <button :class="['osk-tab', layout==='en' && 'on']" @pointerdown.prevent="layout='en'">EN</button>
       <button :class="['osk-tab', layout==='ar' && 'on']" @pointerdown.prevent="layout='ar'">ع</button>
+      <button :class="['osk-tab', layout==='sym' && 'on']" @pointerdown.prevent="layout='sym'">@#!</button>
       <button :class="['osk-tab', layout==='num' && 'on']" @pointerdown.prevent="layout='num'">123</button>
       <span class="osk-grip" v-if="!docked">⠿ {{ Math.round(scale*100) }}%</span>
       <span style="flex:1"></span>
@@ -111,8 +112,23 @@ const NUM = [
   ['1','2','3'],
   ['0','.','-'],
 ];
+// Dedicated symbols layout so @ ! # … are always one tap away (works in any
+// language, and doesn't depend on Shift).
+const SYM = [
+  ['1','2','3','4','5','6','7','8','9','0'],
+  ['!','@','#','$','%','^','&','*','(',')'],
+  ['-','_','=','+','/','\\',':',';','"','\''],
+  ['?','.',',','<','>','[',']','{','}','~'],
+];
 
-const rows = computed(() => (layout.value === 'ar' ? AR : layout.value === 'num' ? NUM : EN));
+const rows = computed(() => {
+  switch (layout.value) {
+    case 'ar': return AR;
+    case 'num': return NUM;
+    case 'sym': return SYM;
+    default: return EN;
+  }
+});
 
 function display(k) {
   if (layout.value === 'en' && shift.value) {
