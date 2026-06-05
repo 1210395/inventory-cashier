@@ -17,8 +17,39 @@
           {{ error }}
         </div>
 
-        <!-- Login Form -->
-        <form @submit.prevent="handleLogin" class="space-y-5">
+        <!-- PIN LOGIN (default when this terminal has a saved account + PIN) -->
+        <div v-if="mode === 'pin'">
+          <p class="text-center text-sm text-gray-500 dark:text-gray-400 mb-1">{{ isAr ? 'أدخل رمز PIN' : 'Enter your PIN' }}</p>
+          <p v-if="saved?.name || saved?.email" class="text-center text-base font-semibold text-gray-800 dark:text-gray-200 mb-4">
+            {{ saved.name || saved.email }}
+          </p>
+
+          <div class="flex justify-center gap-3 mb-6">
+            <span v-for="i in 4" :key="i"
+              class="w-4 h-4 rounded-full border-2"
+              :class="entry.length >= i ? 'bg-yellow-500 border-yellow-500' : 'border-gray-400 dark:border-gray-500'"></span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <button v-for="n in [1,2,3,4,5,6,7,8,9]" :key="n" type="button"
+              class="h-16 rounded-xl text-2xl font-semibold bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white active:bg-yellow-500 active:text-gray-900"
+              @click="tap(n)" :disabled="loading">{{ n }}</button>
+            <button type="button" class="h-16 rounded-xl text-lg font-medium bg-gray-100 dark:bg-gray-700 text-gray-500"
+              @click="entry = ''" :disabled="loading">C</button>
+            <button type="button" class="h-16 rounded-xl text-2xl font-semibold bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white active:bg-yellow-500 active:text-gray-900"
+              @click="tap(0)" :disabled="loading">0</button>
+            <button type="button" class="h-16 rounded-xl text-xl bg-gray-100 dark:bg-gray-700 text-gray-500"
+              @click="entry = entry.slice(0, -1)" :disabled="loading">&#x232B;</button>
+          </div>
+
+          <button type="button" class="w-full mt-6 text-sm text-gray-500 dark:text-gray-400 underline"
+            @click="switchToPassword">
+            {{ isAr ? 'الدخول بالبريد وكلمة المرور' : 'Use email & password' }}
+          </button>
+        </div>
+
+        <!-- EMAIL / PASSWORD LOGIN -->
+        <form v-else @submit.prevent="handleLogin" class="space-y-5">
           <div>
             <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               {{ t('email') }}
@@ -63,6 +94,11 @@
             </span>
             <span v-else>{{ t('login') }}</span>
           </button>
+
+          <button v-if="canUsePin" type="button" class="w-full text-sm text-gray-500 dark:text-gray-400 underline"
+            @click="switchToPin">
+            {{ isAr ? 'الدخول برمز PIN' : 'Use PIN' }}
+          </button>
         </form>
       </div>
     </div>
@@ -70,11 +106,13 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import logo from '../../assets/logo.png';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth.js';
-import { t } from '../../i18n/index.js';
+import { t, locale } from '../../i18n/index.js';
+import { hasPin, verifyPin } from '../../composables/pin.js';
+import { getSavedAccount, saveAccount } from '../../composables/savedAccount.js';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -83,12 +121,53 @@ const email = ref('');
 const password = ref('');
 const error = ref('');
 const loading = ref(false);
+const entry = ref('');
+
+const isAr = computed(() => locale.value === 'ar');
+const saved = ref(getSavedAccount());
+// PIN login is possible only when this device has both a saved account and a PIN.
+const canUsePin = computed(() => !!saved.value && hasPin());
+const mode = ref(canUsePin.value ? 'pin' : 'password');
+
+function switchToPassword() { mode.value = 'password'; entry.value = ''; error.value = ''; }
+function switchToPin() { mode.value = 'pin'; entry.value = ''; error.value = ''; }
+
+function tap(n) {
+  if (loading.value || entry.value.length >= 4) return;
+  entry.value += String(n);
+  if (entry.value.length === 4) submitPin();
+}
+
+async function submitPin() {
+  error.value = '';
+  if (!(await verifyPin(entry.value))) {
+    error.value = isAr.value ? 'رمز خاطئ' : 'Wrong PIN';
+    entry.value = '';
+    return;
+  }
+  const acct = saved.value;
+  if (!acct) { switchToPassword(); return; }
+  loading.value = true;
+  try {
+    await auth.login(acct.email, acct.password);
+    router.push('/pos');
+  } catch (e) {
+    // Saved password may be stale (changed on the server) — fall back to form.
+    error.value = isAr.value ? 'تعذّر الدخول بالـ PIN، استخدم البريد وكلمة المرور' : "Couldn't sign in with PIN — use email & password";
+    entry.value = '';
+    mode.value = 'password';
+  } finally {
+    loading.value = false;
+  }
+}
 
 async function handleLogin() {
   error.value = '';
   loading.value = true;
   try {
     await auth.login(email.value, password.value);
+    // Remember this account so it can sign in with the device PIN next time.
+    saveAccount(email.value, password.value, auth.user?.name || '');
     router.push('/pos');
   } catch (e) {
     if (e.response && e.response.status === 422) {
