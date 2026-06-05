@@ -30,10 +30,9 @@
 import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth.js';
 import { t } from '../i18n/index.js';
+import { PIN_LENGTH, hasPin as pinExists, hashPin, verifyPin, setPin as savePin } from '../composables/pin.js';
 
-const PIN_KEY = 'cashier_pin_hash';
-const SALT = 'hisab-cashier-v1';
-const pinLength = 4;
+const pinLength = PIN_LENGTH;
 
 const auth = useAuthStore();
 const locked = ref(false);
@@ -53,13 +52,7 @@ const title = computed(() => {
 });
 const logoutLabel = computed(() => isArabic() ? 'تبديل المستخدم / خروج' : 'Switch user / Log out');
 
-async function hash(pin) {
-  const data = new TextEncoder().encode(SALT + ':' + pin);
-  const buf = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-function hasPin() { return !!localStorage.getItem(PIN_KEY); }
+function hasPin() { return pinExists(); }
 
 function lockNow() {
   if (!hasPin()) { startSetPin(); return; }
@@ -90,14 +83,13 @@ async function submit() {
       confirming.value = false; firstPin.value = ''; entry.value = '';
       return;
     }
-    localStorage.setItem(PIN_KEY, await hash(pin));
+    await savePin(pin);
     setting.value = false; confirming.value = false; entry.value = '';
     locked.value = true; // lock immediately after setting
     return;
   }
   // unlocking
-  const stored = localStorage.getItem(PIN_KEY);
-  if (stored && (await hash(pin)) === stored) {
+  if (await verifyPin(pin)) {
     locked.value = false; entry.value = ''; error.value = '';
   } else {
     error.value = isArabic() ? 'رمز خاطئ' : 'Wrong PIN';
@@ -120,8 +112,8 @@ onMounted(() => {
 .pin-fab {
   position: fixed; left: 12px; bottom: 12px; z-index: 2147483000;
   width: 52px; height: 52px; border-radius: 50%;
-  background: #374151; color: #fff; border: none; font-size: 22px;
-  box-shadow: 0 4px 14px rgba(0,0,0,.35); cursor: pointer;
+  background: #D4A843; color: #1a1a1a; border: 2px solid #fff; font-size: 22px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.45); cursor: pointer;
 }
 .pin-overlay {
   position: fixed; inset: 0; z-index: 2147483600;

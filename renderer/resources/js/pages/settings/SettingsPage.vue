@@ -109,6 +109,42 @@
           </div>
         </div>
 
+        <!-- Terminal PIN Section -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">{{ isAr ? 'رمز قفل الجهاز (PIN)' : 'Terminal PIN' }}</h2>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ isAr ? 'رمز من 4 أرقام لقفل هذا الجهاز. يُحفظ على هذا الجهاز فقط.' : 'A 4-digit code to lock this terminal. Stored on this device only.' }}</p>
+          <p class="text-sm mb-4">
+            <span class="text-gray-500 dark:text-gray-400">{{ isAr ? 'الحالة:' : 'Status:' }}</span>
+            <span class="font-medium ml-1" :class="pinIsSet ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'">
+              {{ pinIsSet ? (isAr ? 'مفعّل' : 'PIN is set') : (isAr ? 'غير مُعيّن' : 'No PIN set') }}
+            </span>
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div v-if="pinIsSet">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ isAr ? 'الرمز الحالي' : 'Current PIN' }}</label>
+              <input v-model="curPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off"
+                class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white tracking-[0.5em] text-center focus:ring-2 focus:ring-[#D4A843] focus:border-[#D4A843] outline-none" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ isAr ? 'رمز جديد' : 'New PIN' }}</label>
+              <input v-model="newPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off"
+                class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white tracking-[0.5em] text-center focus:ring-2 focus:ring-[#D4A843] focus:border-[#D4A843] outline-none" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ isAr ? 'تأكيد الرمز' : 'Confirm PIN' }}</label>
+              <input v-model="confPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off"
+                class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white tracking-[0.5em] text-center focus:ring-2 focus:ring-[#D4A843] focus:border-[#D4A843] outline-none" />
+            </div>
+          </div>
+          <div v-if="pinMsg" class="mt-3 text-sm" :class="pinErr ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'">{{ pinMsg }}</div>
+          <div class="mt-4 flex items-center gap-3">
+            <AppButton variant="primary" @click="savePinSettings">
+              {{ pinIsSet ? (isAr ? 'تغيير الرمز' : 'Change PIN') : (isAr ? 'تعيين الرمز' : 'Set PIN') }}
+            </AppButton>
+            <AppButton v-if="pinIsSet" variant="danger" @click="removePinSettings">{{ isAr ? 'إزالة الرمز' : 'Remove PIN' }}</AppButton>
+          </div>
+        </div>
+
         <!-- Account Section -->
         <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{{ t('account') || 'Account' }}</h2>
@@ -163,6 +199,7 @@ import AppLayout from '../../components/layout/AppLayout.vue';
 import AppButton from '../../components/base/AppButton.vue';
 import AppInput from '../../components/base/AppInput.vue';
 import AppSelect from '../../components/base/AppSelect.vue';
+import { hasPin, verifyPin, setPin, clearPin } from '../../composables/pin.js';
 
 const authStore = useAuthStore();
 const uiStore = useUiStore();
@@ -252,6 +289,47 @@ onMounted(() => {
 });
 
 const currentLocale = computed(() => locale.value);
+const isAr = computed(() => locale.value === 'ar');
+
+// ---- Terminal PIN management (device-local 4-digit lock) ----
+const pinIsSet = ref(hasPin());
+const curPin = ref('');
+const newPin = ref('');
+const confPin = ref('');
+const pinMsg = ref('');
+const pinErr = ref(false);
+
+function pinFeedback(msg, err) {
+  pinMsg.value = msg;
+  pinErr.value = err;
+  if (!err) setTimeout(() => { pinMsg.value = ''; }, 3000);
+}
+
+async function savePinSettings() {
+  if (pinIsSet.value && !(await verifyPin(curPin.value))) {
+    return pinFeedback(isAr.value ? 'الرمز الحالي غير صحيح' : 'Current PIN is incorrect', true);
+  }
+  if (!/^\d{4}$/.test(newPin.value)) {
+    return pinFeedback(isAr.value ? 'يجب أن يكون الرمز 4 أرقام' : 'PIN must be 4 digits', true);
+  }
+  if (newPin.value !== confPin.value) {
+    return pinFeedback(isAr.value ? 'الرمز غير متطابق' : 'PINs do not match', true);
+  }
+  await setPin(newPin.value);
+  pinIsSet.value = true;
+  curPin.value = ''; newPin.value = ''; confPin.value = '';
+  pinFeedback(isAr.value ? 'تم حفظ الرمز' : 'PIN saved', false);
+}
+
+async function removePinSettings() {
+  if (pinIsSet.value && !(await verifyPin(curPin.value))) {
+    return pinFeedback(isAr.value ? 'أدخل الرمز الحالي للإزالة' : 'Enter the current PIN to remove it', true);
+  }
+  clearPin();
+  pinIsSet.value = false;
+  curPin.value = ''; newPin.value = ''; confPin.value = '';
+  pinFeedback(isAr.value ? 'تم إزالة الرمز' : 'PIN removed', false);
+}
 
 const userInitials = computed(() => {
   const name = authStore.user?.name || '';
