@@ -1,6 +1,8 @@
 // Shared cashier terminal-PIN logic, used by both the lock overlay (PinLock)
 // and the Settings page so they never drift. The PIN is a 4-digit code stored
 // locally on the device as a SHA-256 hash (never in plain text).
+import { durableSet, durableDelete } from './durable.js';
+
 const PIN_KEY = 'cashier_pin_hash';
 const SALT = 'hisab-cashier-v1';
 export const PIN_LENGTH = 4;
@@ -21,9 +23,12 @@ export async function verifyPin(pin) {
 }
 
 export async function setPin(pin) {
-  localStorage.setItem(PIN_KEY, await hashPin(pin));
+  const h = await hashPin(pin);
+  localStorage.setItem(PIN_KEY, h);
+  durableSet(PIN_KEY, h);
 }
 
 export function clearPin() {
   localStorage.removeItem(PIN_KEY);
+  durableDelete(PIN_KEY);
 }

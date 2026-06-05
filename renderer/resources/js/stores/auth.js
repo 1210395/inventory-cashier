@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import api, { setToken, clearToken, getToken } from '../composables/useApi.js';
+import { durableSet } from '../composables/durable.js';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -22,7 +23,9 @@ export const useAuthStore = defineStore('auth', {
         });
         this.user = response.data.user;
         setToken(response.data.token);
-        localStorage.setItem('auth_user', JSON.stringify(response.data.user));
+        const userJson = JSON.stringify(response.data.user);
+        localStorage.setItem('auth_user', userJson);
+        durableSet('auth_user', userJson);
         return response;
       } finally {
         this.loading = false;
@@ -50,7 +53,9 @@ export const useAuthStore = defineStore('auth', {
       try {
         const response = await api.get('/user');
         this.user = response.data;
-        localStorage.setItem('auth_user', JSON.stringify(response.data));
+        const userJson = JSON.stringify(response.data);
+        localStorage.setItem('auth_user', userJson);
+        durableSet('auth_user', userJson);
       } catch {
         this.user = null;
         clearToken();

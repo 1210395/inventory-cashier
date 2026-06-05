@@ -19,6 +19,11 @@ const store = new Store<Settings>({
   },
 });
 
+// Durable key-value backing for renderer state that MUST survive relaunch
+// (terminal PIN, saved account, auth token). Written to disk by the main
+// process because localStorage on a file:// page is not reliably persisted.
+const secureStore = new Store<Record<string, string>>({ name: 'secure', defaults: {} });
+
 const isDev = !app.isPackaged;
 let mainWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
@@ -161,6 +166,17 @@ ipcMain.handle('cashier:listPrinters', async () => {
     const printers = await mainWindow.webContents.getPrintersAsync();
     return printers.map((p) => ({ name: p.name, displayName: p.displayName, isDefault: p.isDefault }));
   } catch { return []; }
+});
+
+// Durable secure store (PIN, saved account, token) — survives relaunch.
+ipcMain.handle('cashier:secureGetAll', () => secureStore.store);
+ipcMain.handle('cashier:secureSet', (_, payload: { key: string; value: string }) => {
+  if (payload && typeof payload.key === 'string') secureStore.set(payload.key, payload.value);
+  return { success: true };
+});
+ipcMain.handle('cashier:secureDelete', (_, key: string) => {
+  if (typeof key === 'string') secureStore.delete(key);
+  return { success: true };
 });
 
 ipcMain.handle('cashier:getSettings', () => ({

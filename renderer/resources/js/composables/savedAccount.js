@@ -2,6 +2,8 @@
 // back in with just the device PIN (no re-typing email/password every shift).
 // Consistent with the existing posture where the auth token already lives in
 // localStorage on this trusted kiosk device; the password is base64-obfuscated.
+import { durableSet, durableDelete } from './durable.js';
+
 const EMAIL_KEY = 'cashier_acct_email';
 const PW_KEY = 'cashier_acct_pw';
 const NAME_KEY = 'cashier_acct_name';
@@ -10,9 +12,12 @@ const enc = (s) => btoa(unescape(encodeURIComponent(s)));
 const dec = (s) => decodeURIComponent(escape(atob(s)));
 
 export function saveAccount(email, password, name) {
+  const pw = enc(password);
   localStorage.setItem(EMAIL_KEY, email);
-  localStorage.setItem(PW_KEY, enc(password));
-  if (name) localStorage.setItem(NAME_KEY, name);
+  localStorage.setItem(PW_KEY, pw);
+  durableSet(EMAIL_KEY, email);
+  durableSet(PW_KEY, pw);
+  if (name) { localStorage.setItem(NAME_KEY, name); durableSet(NAME_KEY, name); }
 }
 
 export function getSavedAccount() {
@@ -30,4 +35,7 @@ export function clearSavedAccount() {
   localStorage.removeItem(EMAIL_KEY);
   localStorage.removeItem(PW_KEY);
   localStorage.removeItem(NAME_KEY);
+  durableDelete(EMAIL_KEY);
+  durableDelete(PW_KEY);
+  durableDelete(NAME_KEY);
 }

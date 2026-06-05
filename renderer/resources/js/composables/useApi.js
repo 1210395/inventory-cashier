@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useRouter } from 'vue-router';
+import { durableSet, durableDelete } from './durable.js';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -27,6 +28,8 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
+      durableDelete('auth_token');
+      durableDelete('auth_user');
       // Hash route so it works under file:// in the Electron cashier shell.
       window.location.hash = '#/login';
     }
@@ -66,11 +69,14 @@ export function clearCache(path) {
 
 export function setToken(token) {
   localStorage.setItem('auth_token', token);
+  durableSet('auth_token', token);
 }
 
 export function clearToken() {
   localStorage.removeItem('auth_token');
   localStorage.removeItem('auth_user');
+  durableDelete('auth_token');
+  durableDelete('auth_user');
 }
 
 export function getToken() {
