@@ -87,16 +87,19 @@ const keysStyle = computed(() => docked.value ? { '--osk-k': (56 * scale.value) 
 
 // US English (ANSI) — number row on top, then the QWERTY rows, matching a
 // physical keyboard so numbers/symbols are exactly where the user expects.
+// Padded to 12/11/11/11 so every key sits in the exact same spot as the Arabic
+// layout (no shifting when toggling languages). The extra slots hold the
+// standard ANSI punctuation.
 const EN = [
   ['1','2','3','4','5','6','7','8','9','0','-','='],
-  ['q','w','e','r','t','y','u','i','o','p'],
-  ['a','s','d','f','g','h','j','k','l'],
-  ['z','x','c','v','b','n','m',',','.','/'],
+  ['q','w','e','r','t','y','u','i','o','p','['],
+  ['a','s','d','f','g','h','j','k','l',';','\''],
+  ['z','x','c','v','b','n','m',',','.','/','\\'],
 ];
 // Shifted faces for the number row + punctuation (US layout).
 const EN_SHIFT = {
   '1':'!','2':'@','3':'#','4':'$','5':'%','6':'^','7':'&','8':'*','9':'(','0':')','-':'_','=':'+',
-  ',':'<','.':'>','/':'?',
+  ',':'<','.':'>','/':'?','[':'{',';':':','\'':'"','\\':'|',
 };
 // Arabic 101 — same digit row on top, then the standard Arabic 101 letter rows.
 const AR = [
@@ -313,6 +316,10 @@ onBeforeUnmount(() => {
 .osk {
   background: #1f2937; padding: 8px; box-shadow: 0 -6px 20px rgba(0,0,0,.4);
   user-select: none; z-index: 2147482000;
+  /* Keep the keyboard left-to-right even when the app is in Arabic (RTL),
+     otherwise the flex rows reverse and the keys no longer follow the
+     US QWERTY / Arabic 101 layout. */
+  direction: ltr;
 }
 /* Docked: full-width bar at the bottom */
 .osk-docked { position: fixed; left: 0; right: 0; bottom: 0; }

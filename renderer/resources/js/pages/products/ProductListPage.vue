@@ -395,7 +395,8 @@ const filteredProducts = computed(() => {
       (p.name_en || '').toLowerCase().includes(q) ||
       (p.name_ar || '').toLowerCase().includes(q) ||
       (p.sku || '').toLowerCase().includes(q) ||
-      (p.barcode || '').toLowerCase().includes(q)
+      (p.barcode || '').toLowerCase().includes(q) ||
+      (Array.isArray(p.barcodes) && p.barcodes.some((b) => (b || '').toLowerCase().includes(q)))
     );
   }
   return result;

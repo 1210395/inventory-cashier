@@ -63,24 +63,45 @@
               :placeholder="t('sku')"
               :error="errors.sku"
             />
-            <div class="flex items-end gap-2">
-              <div class="flex-1">
-                <AppInput
-                  v-model="form.barcode"
-                  :label="t('barcode')"
+            <!-- Barcodes (a product can carry several distributor codes) -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ t('barcode') }}</label>
+              <div v-for="(bc, i) in form.barcodes" :key="i" class="flex items-center gap-2 mb-2">
+                <input
+                  v-model="form.barcodes[i]"
+                  type="text"
                   :placeholder="t('barcode')"
-                  :error="errors.barcode"
+                  class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#D4A843] focus:border-transparent"
                 />
+                <button
+                  type="button"
+                  :title="t('scan_barcode') || 'Scan Barcode'"
+                  class="p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:text-[#D4A843] hover:border-[#D4A843] transition-colors"
+                  @click="scanInto(i)"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h2M3 19a2 2 0 002 2h2m10-18h2a2 2 0 012 2v2m0 10v2a2 2 0 01-2 2h-2M7 7h.01M7 12h10M7 17h.01" />
+                  </svg>
+                </button>
+                <button
+                  v-if="form.barcodes.length > 1"
+                  type="button"
+                  :title="t('remove') || 'Remove'"
+                  class="p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-400 hover:text-red-500 hover:border-red-400 transition-colors"
+                  @click="removeBarcode(i)"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
               <button
                 type="button"
-                :title="t('scan_barcode') || 'Scan Barcode'"
-                class="mb-1 p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:text-[#D4A843] hover:border-[#D4A843] transition-colors"
-                @click="showScanner = true"
+                class="inline-flex items-center gap-1 text-sm font-medium text-[#D4A843] hover:underline"
+                @click="addBarcode"
               >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h2M3 19a2 2 0 002 2h2m10-18h2a2 2 0 012 2v2m0 10v2a2 2 0 01-2 2h-2M7 7h.01M7 12h10M7 17h.01" />
-                </svg>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                {{ t('add') }} {{ t('barcode') }}
               </button>
             </div>
             <!-- Multi-category tag picker -->
@@ -234,7 +255,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api, { cachedGet } from '../../composables/useApi.js';
-import { t } from '../../i18n/index.js';
+import { t, localizedName } from '../../i18n/index.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
 import AppButton from '../../components/base/AppButton.vue';
 import AppInput from '../../components/base/AppInput.vue';
@@ -250,16 +271,23 @@ const submitting = ref(false);
 const error = ref('');
 const errors = ref({});
 const showScanner = ref(false);
+const scanTargetIndex = ref(0);
+function scanInto(i) { scanTargetIndex.value = i; showScanner.value = true; }
 function onScanDetected(code) {
-  if (code) form.value.barcode = code;
+  if (code) form.value.barcodes[scanTargetIndex.value] = code;
   showScanner.value = false;
+}
+function addBarcode() { form.value.barcodes.push(''); }
+function removeBarcode(i) {
+  form.value.barcodes.splice(i, 1);
+  if (form.value.barcodes.length === 0) form.value.barcodes.push('');
 }
 
 const form = ref({
   name_en: '',
   name_ar: '',
   sku: '',
-  barcode: '',
+  barcodes: [''],
   description: '',
   category_uuids: [],
   supplier_uuid: '',
@@ -294,17 +322,41 @@ async function addSerial() {
   }
 }
 
-function toggleCategory(uuid) {
-  const idx = form.value.category_uuids.indexOf(uuid);
-  if (idx >= 0) {
-    form.value.category_uuids.splice(idx, 1);
-  } else {
-    form.value.category_uuids.push(uuid);
-  }
-}
-
 const categoryOptions = ref([]);
 const supplierOptions = ref([]);
+const parentOf = ref({});   // uuid -> parent uuid (or null)
+const childrenOf = ref({});  // uuid -> [child uuids]
+
+function ancestors(uuid) {
+  const out = [];
+  let p = parentOf.value[uuid];
+  while (p) { out.push(p); p = parentOf.value[p]; }
+  return out;
+}
+function descendants(uuid) {
+  const out = [];
+  const stack = [...(childrenOf.value[uuid] || [])];
+  while (stack.length) {
+    const c = stack.pop();
+    out.push(c);
+    for (const g of (childrenOf.value[c] || [])) stack.push(g);
+  }
+  return out;
+}
+
+// Selecting a sub-category also selects its parent chain; removing a parent
+// drops all of its descendants.
+function toggleCategory(uuid) {
+  const sel = new Set(form.value.category_uuids);
+  if (sel.has(uuid)) {
+    sel.delete(uuid);
+    for (const d of descendants(uuid)) sel.delete(d);
+  } else {
+    sel.add(uuid);
+    for (const a of ancestors(uuid)) sel.add(a);
+  }
+  form.value.category_uuids = [...sel];
+}
 
 const marginDisplay = computed(() => {
   const cost = parseFloat(form.value.cost_price) || 0;
@@ -333,6 +385,8 @@ async function submitForm() {
   try {
     const payload = { ...form.value, category_uuids: form.value.category_uuids };
     delete payload.category_uuid;
+    // Send a clean, de-duplicated barcode list; the server derives the primary.
+    payload.barcodes = [...new Set(form.value.barcodes.map((b) => (b || '').trim()).filter(Boolean))];
     if (isEdit.value) {
       await api.put('/products/' + route.params.uuid, payload);
     } else {
@@ -363,17 +417,22 @@ onMounted(async () => {
       cachedGet('/suppliers'),
     ]);
     const rawCategories = catRes.data.data || catRes.data;
-    // If flat list (all=true), use directly; otherwise flatten tree
-    const flatCategories = [];
+    // all=true returns a flat list with parent_uuid on each category.
+    const byUuid = {};
+    rawCategories.forEach((c) => { byUuid[c.uuid] = c; });
+    const pOf = {}, cOf = {};
     rawCategories.forEach((c) => {
-      flatCategories.push({ value: c.uuid, label: c.name_en });
-      if (c.children && c.children.length > 0) {
-        c.children.forEach((child) => {
-          flatCategories.push({ value: child.uuid, label: `${c.name_en} > ${child.name_en}` });
-        });
-      }
+      pOf[c.uuid] = c.parent_uuid || null;
+      if (c.parent_uuid) (cOf[c.parent_uuid] = cOf[c.parent_uuid] || []).push(c.uuid);
     });
-    categoryOptions.value = flatCategories;
+    parentOf.value = pOf;
+    childrenOf.value = cOf;
+    categoryOptions.value = rawCategories.map((c) => ({
+      value: c.uuid,
+      label: c.parent_uuid && byUuid[c.parent_uuid]
+        ? `${localizedName(byUuid[c.parent_uuid])} > ${localizedName(c)}`
+        : localizedName(c),
+    }));
     supplierOptions.value = (supRes.data.data || supRes.data).map((s) => ({
       value: s.uuid,
       label: s.name || s.name_en,
@@ -386,7 +445,7 @@ onMounted(async () => {
         name_en: p.name_en || '',
         name_ar: p.name_ar || '',
         sku: p.sku || '',
-        barcode: p.barcode || '',
+        barcodes: (Array.isArray(p.barcodes) && p.barcodes.length) ? [...p.barcodes] : (p.barcode ? [p.barcode] : ['']),
         description: p.description || '',
         category_uuids: p.categories ? p.categories.map((c) => c.uuid) : (p.category_uuid ? [p.category_uuid] : []),
         supplier_uuid: p.supplier_uuid || '',
