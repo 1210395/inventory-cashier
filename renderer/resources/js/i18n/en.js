@@ -127,7 +127,6 @@ export default {
   marketing: 'Marketing',
   maintenance: 'Maintenance',
   scan_barcode: 'Scan Barcode',
-  add_another_barcode: 'Add another barcode',
   receipt: 'Receipt',
   thank_you: 'Thank you!',
   share: 'Share',
