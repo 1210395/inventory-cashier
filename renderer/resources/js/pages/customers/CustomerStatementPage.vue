@@ -101,6 +101,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { formatMoney } from '../../composables/currency.js';
 import { useRoute } from 'vue-router';
 import api from '../../composables/useApi.js';
 import { t } from '../../i18n/index.js';
@@ -124,10 +125,8 @@ const columns = [
   { key: 'running_balance', label: t('running_balance') },
 ];
 
-function formatCurrency(val) {
-  const num = parseFloat(val);
-  if (isNaN(num)) return '0.00';
-  return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function formatCurrency(value) {
+  return formatMoney(value);
 }
 
 function formatDate(dateStr) {

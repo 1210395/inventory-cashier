@@ -140,6 +140,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { formatMoney } from '../../composables/currency.js';
 import api from '../../composables/useApi.js';
 import { t } from '../../i18n/index.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
@@ -196,10 +197,8 @@ function statusClass(status) {
   }[status] || 'border-gray-300 dark:border-gray-700';
 }
 
-function formatCurrency(val) {
-  const num = parseFloat(val);
-  if (isNaN(num)) return '-';
-  return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function formatCurrency(value) {
+  return formatMoney(value);
 }
 
 function addItemLine() {

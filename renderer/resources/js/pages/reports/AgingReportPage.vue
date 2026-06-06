@@ -92,6 +92,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { formatMoney } from '../../composables/currency.js';
 import api from '../../composables/useApi.js';
 import { t } from '../../i18n/index.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
@@ -131,14 +132,8 @@ const bucketTotals = computed(() => {
   };
 });
 
-function formatCurrency(val) {
-  const num = parseFloat(val);
-  if (isNaN(num)) return '\u20AA0.00';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'ILS',
-    minimumFractionDigits: 2,
-  }).format(num);
+function formatCurrency(value) {
+  return formatMoney(value);
 }
 
 function daysBetween(dateStr) {

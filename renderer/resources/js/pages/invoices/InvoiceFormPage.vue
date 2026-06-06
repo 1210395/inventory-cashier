@@ -277,6 +277,7 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted } from 'vue';
+import { formatMoney } from '../../composables/currency.js';
 import { useRouter, useRoute } from 'vue-router';
 import api from '../../composables/useApi.js';
 import { t, localizedName } from '../../i18n/index.js';
@@ -447,11 +448,7 @@ function recalcLineTotal(idx) {
 }
 
 function formatCurrency(value) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'ILS',
-    minimumFractionDigits: 2,
-  }).format(value || 0);
+  return formatMoney(value);
 }
 
 function computeStatus() {

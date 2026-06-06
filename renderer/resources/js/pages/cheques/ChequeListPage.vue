@@ -158,6 +158,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { formatMoney } from '../../composables/currency.js';
 import api from '../../composables/useApi.js';
 import { t } from '../../i18n/index.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
@@ -262,10 +263,8 @@ function statusBadgeVariant(status) {
   return map[status] || 'neutral';
 }
 
-function formatCurrency(val) {
-  const num = parseFloat(val);
-  if (isNaN(num)) return val;
-  return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function formatCurrency(value) {
+  return formatMoney(value);
 }
 
 function openModal(item = null) {

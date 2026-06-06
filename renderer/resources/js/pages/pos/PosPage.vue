@@ -32,7 +32,7 @@
                 :class="selectedCategoryUuid === cat.uuid ? 'cat-on' : 'cat-off'"
                 @click="drillInto(cat)"
               >
-                <span class="truncate">{{ catName(cat) }}</span>
+                <span class="cat-label">{{ catName(cat) }}</span>
                 <span v-if="hasChildren(cat)" class="cat-caret">{{ _isAr() ? '‹' : '›' }}</span>
               </button>
             </div>
@@ -49,6 +49,17 @@
               @focus="showResults = true"
               @blur="hideResultsDelayed"
             />
+            <button
+              v-if="productSearch"
+              type="button"
+              :title="t('clear') || 'Clear'"
+              class="absolute right-12 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-red-500 hover:text-white hover:bg-red-500 transition-colors"
+              @mousedown.prevent="clearSearch"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
             <button
               type="button"
               :title="t('scan_barcode') || 'Scan Barcode'"
@@ -107,13 +118,6 @@
             v-else-if="selectedCategoryUuid || productSearch"
             class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-center text-sm text-gray-400"
           >{{ _isAr() ? 'لا توجد منتجات هنا' : 'No products here' }}</div>
-          <div
-            v-else
-            class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-center text-gray-400 dark:text-gray-500"
-          >
-            <div class="text-3xl mb-1">&#x1F446;</div>
-            <div class="text-sm">{{ _isAr() ? 'اختر فئة لعرض المنتجات' : 'Tap a category above to see products' }}</div>
-          </div>
 
           <!-- Cart Table -->
           <div class="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden flex flex-col">
@@ -458,6 +462,7 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted, watch } from 'vue';
+import { formatMoney } from '../../composables/currency.js';
 import api from '../../composables/useApi.js';
 import { t } from '../../i18n/index.js';
 import { useUiStore } from '../../stores/ui.js';
@@ -634,7 +639,7 @@ watch(cartTotal, (val) => {
 });
 
 function formatCurrency(value) {
-  return uiStore.formatPrice(value);
+  return formatMoney(value);
 }
 
 function selectCategory(uuid) {
@@ -646,6 +651,14 @@ function selectCategory(uuid) {
 function onSearchInput() {
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => triggerSearch(), 300);
+}
+
+function clearSearch() {
+  productSearch.value = '';
+  showResults.value = false;
+  if (searchTimeout) clearTimeout(searchTimeout);
+  // Re-run so the grid falls back to the selected category (or empties).
+  triggerSearch();
 }
 
 async function triggerSearch() {
@@ -999,9 +1012,9 @@ onMounted(async () => {
 .cat-tile, .subcat-tile {
   min-height: 60px;
   border-radius: 14px;
-  padding: 8px 10px;
+  padding: 8px 8px;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1010,7 +1023,17 @@ onMounted(async () => {
   border: 1px solid transparent;
   transition: transform .06s ease, filter .12s ease;
 }
-.subcat-tile { min-height: 48px; font-size: 14px; font-weight: 600; border-radius: 12px; }
+.subcat-tile { min-height: 48px; font-size: 13px; font-weight: 600; border-radius: 12px; }
+/* Let category names wrap to a couple of lines instead of being cut off. */
+.cat-tile .cat-label, .subcat-tile .cat-label {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .cat-tile:active, .subcat-tile:active, .prod-tile:active { transform: scale(.97); filter: brightness(.95); }
 .cat-on { background: #D4A843; color: #1a1a1a; box-shadow: 0 2px 8px rgba(212,168,67,.4); }
 .cat-off { background: #f3f4f6; color: #374151; }

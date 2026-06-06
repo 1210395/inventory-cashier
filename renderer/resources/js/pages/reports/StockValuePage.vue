@@ -83,6 +83,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { formatMoney } from '../../composables/currency.js';
 import api from '../../composables/useApi.js';
 import { t } from '../../i18n/index.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
@@ -164,14 +165,8 @@ const totalSellValue = computed(() =>
 
 const potentialProfit = computed(() => totalSellValue.value - totalCostValue.value);
 
-function formatCurrency(val) {
-  const num = parseFloat(val);
-  if (isNaN(num)) return '0.00';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'ILS',
-    minimumFractionDigits: 2,
-  }).format(num);
+function formatCurrency(value) {
+  return formatMoney(value);
 }
 
 async function fetchData() {

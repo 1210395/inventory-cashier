@@ -121,6 +121,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { formatMoney } from '../../composables/currency.js';
 import api from '../../composables/useApi.js';
 import { t } from '../../i18n/index.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
@@ -131,10 +132,8 @@ const error = ref('');
 const data = ref(null);
 const selectedDate = ref(new Date().toISOString().split('T')[0]);
 
-function formatCurrency(val) {
-  const num = parseFloat(val);
-  if (isNaN(num)) return '0.00';
-  return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function formatCurrency(value) {
+  return formatMoney(value);
 }
 
 async function fetchData() {

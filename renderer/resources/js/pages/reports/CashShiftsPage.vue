@@ -203,6 +203,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { formatMoney } from '../../composables/currency.js';
 import api from '../../composables/useApi.js';
 import { t, locale } from '../../i18n/index.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
@@ -290,10 +291,8 @@ const closeDifference = computed(() => {
   return Number(closeForm.value.close_amount) - expectedCash(currentShift.value);
 });
 
-function formatCurrency(val) {
-  const num = parseFloat(val);
-  if (isNaN(num)) return '-';
-  return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function formatCurrency(value) {
+  return formatMoney(value);
 }
 
 function formatDateTime(dateStr) {

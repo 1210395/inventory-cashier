@@ -214,6 +214,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { formatMoney } from '../../composables/currency.js';
 import { useRoute, useRouter } from 'vue-router';
 import api from '../../composables/useApi.js';
 import { t, localizedName, isRtl } from '../../i18n/index.js';
@@ -255,11 +256,7 @@ const margin = computed(() => {
 });
 
 function formatCurrency(value) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'ILS',
-    minimumFractionDigits: 2,
-  }).format(parseFloat(value) || 0);
+  return formatMoney(value);
 }
 
 async function deleteProduct() {

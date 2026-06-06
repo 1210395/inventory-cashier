@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { setCurrency } from '../composables/currency.js';
 
 export const useUiStore = defineStore('ui', {
   state: () => ({
@@ -61,6 +62,7 @@ export const useUiStore = defineStore('ui', {
         Object.assign(this.settings, s);
       }
       localStorage.setItem('appSettings', JSON.stringify(this.settings));
+      setCurrency(this.settings.currency_symbol, this.settings.currency_position);
     },
 
     loadSettingsFromStorage() {
@@ -72,6 +74,7 @@ export const useUiStore = defineStore('ui', {
       } catch (e) {
         // ignore
       }
+      setCurrency(this.settings.currency_symbol, this.settings.currency_position);
     },
   },
 });

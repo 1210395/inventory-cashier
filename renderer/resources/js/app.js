@@ -5,6 +5,7 @@ import { createPinia } from 'pinia';
 import router from './router';
 import { setLocale } from './i18n';
 import { hydrateDurable } from './composables/durable.js';
+import { initCurrencyFromStorage } from './composables/currency.js';
 import App from './App.vue';
 
 // Restore durable state (PIN, saved account, auth token/user) from the main
@@ -26,6 +27,9 @@ hydrateDurable().finally(() => {
   // Initialize locale from localStorage
   const savedLocale = localStorage.getItem('locale') || 'en';
   setLocale(savedLocale);
+
+  // Apply the saved currency so prices format correctly app-wide on first paint.
+  initCurrencyFromStorage();
 
   app.mount('#app');
 });

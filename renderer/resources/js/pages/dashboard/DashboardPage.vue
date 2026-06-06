@@ -144,6 +144,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { formatMoney } from '../../composables/currency.js';
 import { useRouter } from 'vue-router';
 import api from '../../composables/useApi.js';
 import { t } from '../../i18n/index.js';
@@ -181,12 +182,7 @@ const maxExpense = computed(() => {
 });
 
 function formatCurrency(value) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'ILS',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
+  return formatMoney(value);
 }
 
 function getDayLabel(dateStr) {
