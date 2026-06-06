@@ -87,18 +87,26 @@ const keysStyle = computed(() => docked.value ? { '--osk-k': (56 * scale.value) 
 
 // US English (ANSI) — number row on top, then the QWERTY rows, matching a
 // physical keyboard so numbers/symbols are exactly where the user expects.
+// Padded to 11 keys per letter row (with standard ANSI bracket/punctuation
+// in the last slot of each row) so that the AR layout below — which has 11
+// letters per row in standard Arabic 101 — sits in EXACTLY the same key
+// positions. Keys don't move when switching languages. 2026-06-06.
 const EN = [
   ['1','2','3','4','5','6','7','8','9','0','-','='],
-  ['q','w','e','r','t','y','u','i','o','p'],
-  ['a','s','d','f','g','h','j','k','l'],
-  ['z','x','c','v','b','n','m',',','.','/'],
+  ['q','w','e','r','t','y','u','i','o','p','['],
+  ['a','s','d','f','g','h','j','k','l',';','\''],
+  ['z','x','c','v','b','n','m',',','.','/','\\'],
 ];
 // Shifted faces for the number row + punctuation (US layout).
 const EN_SHIFT = {
   '1':'!','2':'@','3':'#','4':'$','5':'%','6':'^','7':'&','8':'*','9':'(','0':')','-':'_','=':'+',
   ',':'<','.':'>','/':'?',
+  '[':'{',';':':','\'':'"','\\':'|',
 };
-// Arabic 101 — same digit row on top, then the standard Arabic 101 letter rows.
+// Arabic 101 — same digit row on top, then the standard Arabic 101 letter
+// rows. Each letter row has 11 keys, so EN above is padded to 11 too — the
+// keyboard's visual layout is identical in both languages; only the glyphs
+// on each key change. This is what the user expects when toggling EN↔AR.
 const AR = [
   ['1','2','3','4','5','6','7','8','9','0','-','='],
   ['ض','ص','ث','ق','ف','غ','ع','ه','خ','ح','ج'],

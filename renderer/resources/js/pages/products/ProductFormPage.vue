@@ -63,25 +63,51 @@
               :placeholder="t('sku')"
               :error="errors.sku"
             />
-            <div class="flex items-end gap-2">
-              <div class="flex-1">
-                <AppInput
-                  v-model="form.barcode"
-                  :label="t('barcode')"
-                  :placeholder="t('barcode')"
-                  :error="errors.barcode"
-                />
+            <!-- Multi-barcode list. The first row is the primary barcode
+                 (mirrors the legacy `barcode` column). Click + to add another;
+                 click the X to remove an extra. 2026-06-06. -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ t('barcode') }}</label>
+              <div
+                v-for="(_, bi) in form.barcodes"
+                :key="bi"
+                class="flex items-end gap-2 mb-2"
+              >
+                <div class="flex-1">
+                  <AppInput
+                    :model-value="form.barcodes[bi]"
+                    @update:modelValue="(v) => form.barcodes[bi] = v"
+                    :placeholder="bi === 0 ? t('barcode') : (t('barcode') + ' #' + (bi + 1))"
+                    :error="bi === 0 ? errors.barcode : ''"
+                  />
+                </div>
+                <button
+                  type="button"
+                  :title="t('scan_barcode') || 'Scan Barcode'"
+                  class="mb-1 p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:text-[#D4A843] hover:border-[#D4A843] transition-colors"
+                  @click="openScannerForRow(bi)"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h2M3 19a2 2 0 002 2h2m10-18h2a2 2 0 012 2v2m0 10v2a2 2 0 01-2 2h-2M7 7h.01M7 12h10M7 17h.01" />
+                  </svg>
+                </button>
+                <button
+                  v-if="form.barcodes.length > 1"
+                  type="button"
+                  :title="t('remove') || 'Remove'"
+                  class="mb-1 p-2.5 rounded-lg border border-red-300 dark:border-red-700 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  @click="form.barcodes.splice(bi, 1)"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
               <button
                 type="button"
-                :title="t('scan_barcode') || 'Scan Barcode'"
-                class="mb-1 p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:text-[#D4A843] hover:border-[#D4A843] transition-colors"
-                @click="showScanner = true"
-              >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h2M3 19a2 2 0 002 2h2m10-18h2a2 2 0 012 2v2m0 10v2a2 2 0 01-2 2h-2M7 7h.01M7 12h10M7 17h.01" />
-                </svg>
-              </button>
+                class="text-xs px-3 py-1.5 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:text-[#D4A843] hover:border-[#D4A843] transition-colors"
+                @click="form.barcodes.push('')"
+              >+ {{ t('add_another_barcode') || 'Add another barcode' }}</button>
             </div>
             <!-- Multi-category tag picker -->
             <div>
@@ -250,8 +276,26 @@ const submitting = ref(false);
 const error = ref('');
 const errors = ref({});
 const showScanner = ref(false);
+// Which barcode row should receive the next scan. -1 = none open.
+const scannerTargetRow = ref(-1);
+function openScannerForRow(rowIndex) {
+  scannerTargetRow.value = rowIndex;
+  showScanner.value = true;
+}
 function onScanDetected(code) {
-  if (code) form.value.barcode = code;
+  if (code && scannerTargetRow.value >= 0) {
+    // Set into the targeted barcode row instead of clobbering the primary.
+    if (form.value.barcodes.length <= scannerTargetRow.value) {
+      form.value.barcodes.push(code);
+    } else {
+      form.value.barcodes[scannerTargetRow.value] = code;
+    }
+  } else if (code) {
+    // Fallback for the legacy single-barcode case
+    if (form.value.barcodes.length === 0) form.value.barcodes.push(code);
+    else form.value.barcodes[0] = code;
+  }
+  scannerTargetRow.value = -1;
   showScanner.value = false;
 }
 
@@ -259,7 +303,9 @@ const form = ref({
   name_en: '',
   name_ar: '',
   sku: '',
-  barcode: '',
+  // barcodes[0] is the primary (sent to BE as `barcode` for legacy lookups).
+  // Always has at least one row so the UI doesn't render zero inputs.
+  barcodes: [''],
   description: '',
   category_uuids: [],
   supplier_uuid: '',
@@ -294,12 +340,31 @@ async function addSerial() {
   }
 }
 
+// child-uuid → parent-uuid map, built when categories are flattened. Used by
+// toggleCategory so that selecting a subcategory automatically pulls the
+// parent main category into the selection (and removing the parent drops
+// the children too). 2026-06-06.
+const categoryParentMap = ref(new Map());
+
 function toggleCategory(uuid) {
   const idx = form.value.category_uuids.indexOf(uuid);
   if (idx >= 0) {
+    // Removing the parent → also drop any of its currently-selected children.
     form.value.category_uuids.splice(idx, 1);
+    const childrenOfRemoved = [];
+    for (const [childUuid, parentUuid] of categoryParentMap.value.entries()) {
+      if (parentUuid === uuid) childrenOfRemoved.push(childUuid);
+    }
+    form.value.category_uuids = form.value.category_uuids.filter(
+      (u) => !childrenOfRemoved.includes(u)
+    );
   } else {
     form.value.category_uuids.push(uuid);
+    // If this is a subcategory, ensure its parent is also selected.
+    const parentUuid = categoryParentMap.value.get(uuid);
+    if (parentUuid && !form.value.category_uuids.includes(parentUuid)) {
+      form.value.category_uuids.push(parentUuid);
+    }
   }
 }
 
@@ -331,7 +396,18 @@ async function submitForm() {
   submitting.value = true;
   error.value = '';
   try {
-    const payload = { ...form.value, category_uuids: form.value.category_uuids };
+    // Sanitize barcodes: trim + drop blanks. The BE re-runs the same
+    // normalization, but doing it here keeps the legacy `barcode` field in
+    // sync with what the user just typed.
+    const cleanBarcodes = (form.value.barcodes || [])
+      .map((b) => (typeof b === 'string' ? b.trim() : ''))
+      .filter((b) => b !== '');
+    const payload = {
+      ...form.value,
+      category_uuids: form.value.category_uuids,
+      barcodes: cleanBarcodes,
+      barcode: cleanBarcodes[0] || null,
+    };
     delete payload.category_uuid;
     if (isEdit.value) {
       await api.put('/products/' + route.params.uuid, payload);
@@ -363,17 +439,22 @@ onMounted(async () => {
       cachedGet('/suppliers'),
     ]);
     const rawCategories = catRes.data.data || catRes.data;
-    // If flat list (all=true), use directly; otherwise flatten tree
+    // Flatten the category tree into a tag-picker list AND build the
+    // child→parent map that toggleCategory uses to auto-select the parent
+    // when a subcategory is picked.
     const flatCategories = [];
+    const parentMap = new Map();
     rawCategories.forEach((c) => {
       flatCategories.push({ value: c.uuid, label: c.name_en });
       if (c.children && c.children.length > 0) {
         c.children.forEach((child) => {
           flatCategories.push({ value: child.uuid, label: `${c.name_en} > ${child.name_en}` });
+          parentMap.set(child.uuid, c.uuid);
         });
       }
     });
     categoryOptions.value = flatCategories;
+    categoryParentMap.value = parentMap;
     supplierOptions.value = (supRes.data.data || supRes.data).map((s) => ({
       value: s.uuid,
       label: s.name || s.name_en,
@@ -382,11 +463,17 @@ onMounted(async () => {
     if (isEdit.value) {
       const res = await api.get('/products/' + route.params.uuid);
       const p = res.data.data || res.data;
+      // BE returns `barcodes` as an array; fall back to wrapping the legacy
+      // single `barcode` for products that pre-date the migration. Empty array
+      // → seed one empty row so the form renders an editable input.
+      const loadedBarcodes = Array.isArray(p.barcodes) && p.barcodes.length > 0
+        ? p.barcodes.map((b) => String(b))
+        : (p.barcode ? [String(p.barcode)] : ['']);
       form.value = {
         name_en: p.name_en || '',
         name_ar: p.name_ar || '',
         sku: p.sku || '',
-        barcode: p.barcode || '',
+        barcodes: loadedBarcodes,
         description: p.description || '',
         category_uuids: p.categories ? p.categories.map((c) => c.uuid) : (p.category_uuid ? [p.category_uuid] : []),
         supplier_uuid: p.supplier_uuid || '',
