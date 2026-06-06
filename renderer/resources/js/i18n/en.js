@@ -28,6 +28,7 @@ export default {
   yes: 'Yes',
   no: 'No',
   total_products: 'Total Products',
+  today_sales: "Today's Sales",
   inventory_value: 'Inventory Value',
   low_stock: 'Low Stock',
   total_customers: 'Total Customers',

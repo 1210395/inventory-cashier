@@ -20,6 +20,14 @@
         </div>
 
         <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <div class="cursor-pointer" @click="router.push('/reports/daily-reconciliation')">
+            <KpiCard
+              :icon="'&#x1F4B5;'"
+              :label="t('today_sales') || 'Today\'s Sales'"
+              :value="formatCurrency(data.today_sales ?? 0) + ' (' + (data.today_sales_count ?? 0) + ')'"
+              color="green"
+            />
+          </div>
           <div class="cursor-pointer" @click="router.push('/products')">
             <KpiCard
               :icon="'&#x1F4E6;'"
@@ -271,6 +279,8 @@ onMounted(async () => {
       total_suppliers: d.total_suppliers ?? 0,
       receivable: d.total_receivable ?? d.receivable ?? 0,
       upcoming_cheques: d.upcoming_cheques_7days ?? d.upcoming_cheques ?? 0,
+      today_sales: d.today_sales_total ?? 0,
+      today_sales_count: d.today_sales_count ?? 0,
     };
   } catch (e) {
     console.error('Failed to load dashboard data:', e);
