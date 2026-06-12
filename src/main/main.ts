@@ -135,12 +135,19 @@ app.on('will-quit', () => globalShortcut.unregisterAll());
 
 // ---- Cash drawer / raw ESC/POS printing (Windows) ----
 
-// Cash-drawer kick: ESC p m t1 t2. Drawers wire the solenoid to either pin 2
-// (m=0) or pin 5 (m=1), so we pulse BOTH — the drawer opens regardless of how
-// it's wired, and the inactive pin is simply ignored.
+// Cash-drawer kick. We send several standard kick commands in one raw job so
+// the drawer opens regardless of how it's wired or which command its printer
+// firmware expects; the printer ignores the ones that don't apply:
+//   ESC p m t1 t2   — classic pulse on pin 2 (m=0) and pin 5 (m=1)
+//   DLE DC4 1 m t   — real-time pulse on pin 2 (m=0) and pin 5 (m=1)
+//   BEL             — legacy drawers
+// Pulse widened (t1=0x32 → ~100ms on) since some drawers ignore a short pulse.
 const DRAWER_KICK = Buffer.from([
-  0x1b, 0x70, 0x00, 0x19, 0xfa, // ESC p 0 25 250  (pin 2)
-  0x1b, 0x70, 0x01, 0x19, 0xfa, // ESC p 1 25 250  (pin 5)
+  0x1b, 0x70, 0x00, 0x32, 0xfa, // ESC p 0  (pin 2)
+  0x1b, 0x70, 0x01, 0x32, 0xfa, // ESC p 1  (pin 5)
+  0x10, 0x14, 0x01, 0x00, 0x05, // DLE DC4 1 0 5 (real-time, pin 2)
+  0x10, 0x14, 0x01, 0x01, 0x05, // DLE DC4 1 1 5 (real-time, pin 5)
+  0x07,                         // BEL
 ]);
 
 function rawPrintWindows(printerName: string, data: Buffer): Promise<{ success: boolean; error?: string }> {
