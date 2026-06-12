@@ -32,34 +32,49 @@ function nameBi(obj) {
 // Build the standalone print document. `autoPrint` injects the browser
 // self-print script; the native (Electron) path leaves it out because the main
 // process triggers the print silently.
-function buildDoc(title, bodyHtml, widthCss, autoPrint) {
+// Build the standalone print document. `autoPrint` injects the browser
+// self-print script; the native (Electron) path leaves it out because the main
+// process triggers the print silently. When `widthMm` is set the document is
+// laid out for a narrow thermal roll (e.g. 80mm Rongta) — full width, no
+// centering, tight margins — instead of a centered A4 page.
+function buildDoc(title, bodyHtml, widthCss, autoPrint, widthMm) {
   const autoScript = autoPrint
     ? '<script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close();},300);};<\/script>'
     : '';
+  const thermal = typeof widthMm === 'number' && widthMm > 0;
+  // Thermal: page == roll width, body fills it, minimal side padding so text
+  // isn't clipped at the right edge. A4: original centered layout.
+  const pageRule = thermal
+    ? `@page { size: ${widthMm}mm auto; margin: 0; } body { padding: 2mm 3mm; }`
+    : `@media print { body { padding: 0; } @page { margin: 8mm; } }`;
+  const bodyWidth = thermal
+    ? `width: ${widthMm}mm; margin: 0; padding: 2mm 3mm; font-size: 12px;`
+    : `padding: 16px; ${widthCss}`;
   return `<!doctype html><html><head><meta charset="utf-8"/>
 <title>${esc(title)}</title>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: Arial, "Segoe UI", "Tahoma", sans-serif; color: #111; margin: 0; padding: 16px; ${widthCss} }
+  body { font-family: Arial, "Segoe UI", "Tahoma", sans-serif; color: #111; margin: 0; ${bodyWidth} }
   h1 { font-size: 20px; margin: 0 0 2px; }
   .muted { color: #666; }
-  table { width: 100%; border-collapse: collapse; margin: 14px 0; }
-  th, td { padding: 6px 4px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; margin: ${thermal ? '8px' : '14px'} 0; }
+  th, td { padding: ${thermal ? '3px 2px' : '6px 4px'}; font-size: ${thermal ? '12px' : '13px'}; }
   thead th { border-bottom: 2px solid #333; text-align: left; }
   tbody td { border-bottom: 1px solid #ddd; }
   .r { text-align: right; }
   .c { text-align: center; }
-  .totals { margin-left: auto; width: 60%; }
+  .totals { margin-left: auto; width: ${thermal ? '100%' : '60%'}; }
   .totals td { border: none; padding: 2px 4px; }
-  .grand { font-size: 16px; font-weight: bold; border-top: 2px solid #333; }
+  .grand { font-size: ${thermal ? '14px' : '16px'}; font-weight: bold; border-top: 2px solid #333; }
   .hdr { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
   .biz { font-weight: bold; font-size: 16px; }
-  @media print { body { padding: 0; } @page { margin: 8mm; } }
+  ${pageRule}
 </style></head><body>${bodyHtml}${autoScript}
 </body></html>`;
 }
 
-function openAndPrint(title, bodyHtml, widthCss) {
+function openAndPrint(title, bodyHtml, widthCss, opts) {
+  const widthMm = opts && typeof opts.widthMm === 'number' ? opts.widthMm : undefined;
   // In the Electron cashier kiosk, print silently to the configured receipt
   // printer via the native bridge — no pop-up, no permission prompt, no risk of
   // blanking the app. (Previously window.open('') was denied by the kiosk's
@@ -68,8 +83,8 @@ function openAndPrint(title, bodyHtml, widthCss) {
   const native = typeof window !== 'undefined'
     && window.cashier && typeof window.cashier.printHtml === 'function';
   if (native) {
-    const doc = buildDoc(title, bodyHtml, widthCss, false);
-    Promise.resolve(window.cashier.printHtml(doc))
+    const doc = buildDoc(title, bodyHtml, widthCss, false, widthMm);
+    Promise.resolve(window.cashier.printHtml(doc, widthMm ? { widthMm } : undefined))
       .then((r) => {
         if (r && r.success === false) {
           alert(r.error
@@ -88,7 +103,7 @@ function openAndPrint(title, bodyHtml, widthCss) {
     return;
   }
   w.document.open();
-  w.document.write(buildDoc(title, bodyHtml, widthCss, true));
+  w.document.write(buildDoc(title, bodyHtml, widthCss, true, widthMm));
   w.document.close();
 }
 
@@ -195,5 +210,7 @@ export function printReceipt({ lines, settings, fmt, totals, paymentMethod }) {
     </table>
     <p style="text-align:center;font-size:12px;margin-top:10px;">${bi('thank_you', 'Thank you!')}</p>
   `;
-  openAndPrint('Receipt', body, 'max-width: 280px; margin: 0 auto;');
+  // 80mm thermal roll (Rongta and most receipt printers). Pass widthMm so the
+  // print page matches the paper and the whole receipt is visible.
+  openAndPrint('Receipt', body, 'max-width: 280px; margin: 0 auto;', { widthMm: 80 });
 }

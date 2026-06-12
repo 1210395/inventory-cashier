@@ -6,7 +6,9 @@ contextBridge.exposeInMainWorld('cashier', {
   openDrawer: () => ipcRenderer.invoke('cashier:openDrawer'),
   rawPrint: (bytes: number[]) => ipcRenderer.invoke('cashier:rawPrint', bytes),
   // Silent receipt/label printing — no browser pop-up, no print dialog.
-  printHtml: (html: string) => ipcRenderer.invoke('cashier:printHtml', html),
+  // options.widthMm = roll width for thermal receipts (e.g. 80); omit for A4.
+  printHtml: (html: string, options?: { widthMm?: number }) =>
+    ipcRenderer.invoke('cashier:printHtml', { html, options: options || {} }),
   listPrinters: () => ipcRenderer.invoke('cashier:listPrinters'),
   getSettings: () => ipcRenderer.invoke('cashier:getSettings'),
   saveSettings: (s: any) => ipcRenderer.invoke('cashier:saveSettings', s),

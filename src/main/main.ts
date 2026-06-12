@@ -197,11 +197,21 @@ ipcMain.handle('cashier:rawPrint', async (_, bytes: number[]) => {
 //   2. The window must actually paint before print() is called. We show it
 //      off-screen (showInactive, far off the desktop, no taskbar/focus) and wait
 //      for `ready-to-show` + a short tick so a frame exists to print.
-ipcMain.handle('cashier:printHtml', async (_, html: string) => {
+ipcMain.handle('cashier:printHtml', async (_, payload: { html: string; options?: { widthMm?: number } } | string) => {
+  // Accept either a raw HTML string (back-compat) or { html, options }.
+  const html = typeof payload === 'string' ? payload : payload?.html;
+  const options = (typeof payload === 'string' ? null : payload?.options) || {};
+  // widthMm is set for thermal receipts (e.g. 80mm Rongta rolls). When set we
+  // print at that exact roll width and size the page height to the content, so
+  // the whole receipt is visible instead of a thin strip of an A4 page.
+  const widthMm = typeof options.widthMm === 'number' && options.widthMm > 0 ? options.widthMm : null;
+
   return new Promise<{ success: boolean; error?: string }>((resolve) => {
+    if (!html) return resolve({ success: false, error: 'No content to print' });
     const tmpHtml = path.join(os.tmpdir(), `hisab-receipt-${Date.now()}.html`);
     let win: BrowserWindow | null = null;
     let settled = false;
+    let printing = false;
     const finish = (result: { success: boolean; error?: string }) => {
       if (settled) return;
       settled = true;
@@ -217,10 +227,13 @@ ipcMain.handle('cashier:printHtml', async (_, html: string) => {
       return resolve({ success: false, error: e?.message || String(e) });
     }
 
+    // Match the on-screen layout width to the print width so the measured
+    // content height lines up with the printed roll.
+    const winWidth = widthMm ? Math.ceil((widthMm * 96) / 25.4) + 24 : 420;
     win = new BrowserWindow({
       show: false,
-      width: 420,
-      height: 700,
+      width: winWidth,
+      height: 800,
       x: -32000,
       y: -32000,
       skipTaskbar: true,
@@ -229,10 +242,21 @@ ipcMain.handle('cashier:printHtml', async (_, html: string) => {
     });
 
     const doPrint = async () => {
-      if (!win) return;
+      if (printing || !win) return; // guard: ready-to-show AND did-finish-load both fire
+      printing = true;
       const deviceName = await resolvePrinterName();
-      const opts: any = { silent: true, printBackground: true };
+      const opts: any = { silent: true, printBackground: true, margins: { marginType: 'none' } };
       if (deviceName) opts.deviceName = deviceName;
+      if (widthMm) {
+        // Size the page to the content so the thermal printer cuts at the end
+        // of the receipt rather than feeding a full A4 page.
+        let heightMicrons = 300000; // ~300mm fallback
+        try {
+          const px = Number(await win.webContents.executeJavaScript('Math.ceil(document.body.scrollHeight)'));
+          if (px > 0) heightMicrons = Math.round(px * (25400 / 96)) + 8000; // +~8mm tail so nothing is cut
+        } catch { /* use fallback height */ }
+        opts.pageSize = { width: Math.round(widthMm * 1000), height: Math.max(heightMicrons, 40000) };
+      }
       try {
         win.webContents.print(opts, (success, failureReason) => {
           finish({ success, error: success ? undefined : (failureReason || 'Printing failed') });
