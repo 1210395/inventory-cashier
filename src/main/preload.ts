@@ -10,8 +10,9 @@ contextBridge.exposeInMainWorld('cashier', {
   printHtml: (html: string, options?: { widthMm?: number }) =>
     ipcRenderer.invoke('cashier:printHtml', { html, options: options || {} }),
   // Driver-independent thermal receipt: render to an image + ESC/POS raster.
-  printRaster: (html: string, widthMm?: number) =>
-    ipcRenderer.invoke('cashier:printRaster', { html, widthMm: widthMm || 80 }),
+  // openDrawer embeds the cash-drawer kick into this same print job.
+  printRaster: (html: string, widthMm?: number, openDrawer?: boolean) =>
+    ipcRenderer.invoke('cashier:printRaster', { html, widthMm: widthMm || 80, openDrawer: !!openDrawer }),
   // Append a diagnostic line to log.txt from the renderer.
   log: (msg: string) => ipcRenderer.invoke('cashier:log', msg),
   listPrinters: () => ipcRenderer.invoke('cashier:listPrinters'),

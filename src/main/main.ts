@@ -142,13 +142,14 @@ app.on('will-quit', () => globalShortcut.unregisterAll());
 //   DLE DC4 1 m t   — real-time pulse on pin 2 (m=0) and pin 5 (m=1)
 //   BEL             — legacy drawers
 // Pulse widened (t1=0x32 → ~100ms on) since some drawers ignore a short pulse.
-const DRAWER_KICK = Buffer.from([
+const DRAWER_KICK_BYTES = [
+  0x1b, 0x40,                   // ESC @  (init — some printers ignore kicks until initialized)
   0x1b, 0x70, 0x00, 0x32, 0xfa, // ESC p 0  (pin 2)
   0x1b, 0x70, 0x01, 0x32, 0xfa, // ESC p 1  (pin 5)
   0x10, 0x14, 0x01, 0x00, 0x05, // DLE DC4 1 0 5 (real-time, pin 2)
   0x10, 0x14, 0x01, 0x01, 0x05, // DLE DC4 1 1 5 (real-time, pin 5)
-  0x07,                         // BEL
-]);
+];
+const DRAWER_KICK = Buffer.from(DRAWER_KICK_BYTES);
 
 function rawPrintWindows(printerName: string, data: Buffer): Promise<{ success: boolean; error?: string }> {
   return new Promise((resolve) => {
@@ -347,9 +348,10 @@ ipcMain.handle('cashier:printHtml', async (_, payload: { html: string; options?:
 // avoids ALL driver page-size/positioning issues — the printer prints the
 // bitmap at the roll width, left-aligned, and cuts at the end. Arabic is fine
 // because it's an image.
-ipcMain.handle('cashier:printRaster', async (_, payload: { html: string; widthMm?: number }) => {
+ipcMain.handle('cashier:printRaster', async (_, payload: { html: string; widthMm?: number; openDrawer?: boolean }) => {
   const html = payload?.html;
   const widthMm = (payload?.widthMm && payload.widthMm > 0) ? payload.widthMm : 80;
+  const openDrawer = !!payload?.openDrawer; // include the drawer kick in this print job
   // CSS layout width (≈ mm @96dpi) and target printer dot width (80mm rolls are
   // 576 printable dots at 203dpi).
   const cssWidth = Math.max(120, Math.round((widthMm * 96) / 25.4));
@@ -422,9 +424,13 @@ ipcMain.handle('cashier:printRaster', async (_, payload: { html: string; widthMm
         bytes.push(0x0a, 0x0a, 0x0a, 0x0a); // feed clear of the cutter
         bytes.push(0x1d, 0x56, 0x42, 0x00); // GS V 66 0 — feed & partial cut
 
+        // On cash sales, fire the drawer as part of THIS print job (some
+        // printers only pulse the drawer from within a print job, not a bare
+        // standalone command).
+        const finalBytes = openDrawer ? DRAWER_KICK_BYTES.concat(bytes) : bytes;
         const printer = await resolvePrinterName();
-        logLine('raster: sending', bytes.length, 'bytes to', printer || '(none)');
-        const r = await rawPrintWindows(printer, Buffer.from(bytes));
+        logLine('raster: sending', finalBytes.length, 'bytes to', printer || '(none)', 'openDrawer', openDrawer);
+        const r = await rawPrintWindows(printer, Buffer.from(finalBytes));
         logLine('raster: result', r);
         finish(r.success ? { success: true } : { success: false, error: r.error });
       } catch (e: any) {

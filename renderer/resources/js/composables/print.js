@@ -84,7 +84,7 @@ function openAndPrint(title, bodyHtml, widthCss, opts) {
   // the printer driver's page handling or come out as TSPL/label garbage.
   if (cashier && widthMm && typeof cashier.printRaster === 'function') {
     const doc = buildDoc(title, bodyHtml, widthCss, false, widthMm);
-    Promise.resolve(cashier.printRaster(doc, widthMm))
+    Promise.resolve(cashier.printRaster(doc, widthMm, opts && opts.openDrawer))
       .then((r) => {
         if (r && r.success === false) {
           // Fall back to the driver print path if raster couldn't run.
@@ -223,7 +223,7 @@ export function printReceipt({
 
   const body = `
     <div style="text-align:center;margin-bottom:4px;">
-      <div class="biz" style="font-size:17px;">${esc(s.business_name || 'Hisab')}</div>
+      <div class="biz" style="font-size:17px;">${esc(s.business_name || cashierName || 'Hisab')}</div>
       ${s.business_phone ? `<div class="muted" style="font-size:11px;">${esc(s.business_phone)}</div>` : ''}
       ${s.business_address ? `<div class="muted" style="font-size:11px;">${esc(s.business_address)}</div>` : ''}
       ${s.tax_id ? `<div class="muted" style="font-size:11px;">${bi('tax_id', 'Tax ID')}: ${esc(s.tax_id)}</div>` : ''}
@@ -260,7 +260,9 @@ export function printReceipt({
     <p style="text-align:center;font-size:13px;font-weight:600;margin:8px 0 2px;">${bi('thank_you', 'Thank you!')}</p>
     <p class="muted" style="text-align:center;font-size:10px;margin:0;">${esc(when)}</p>
   `;
-  // 80mm thermal roll (Rongta and most receipt printers). Pass widthMm so the
-  // print page matches the paper and the whole receipt is visible.
-  openAndPrint('Receipt', body, 'max-width: 280px; margin: 0 auto;', { widthMm: 80 });
+  // 80mm thermal roll. On cash sales, open the drawer as part of this print job.
+  openAndPrint('Receipt', body, 'max-width: 280px; margin: 0 auto;', {
+    widthMm: 80,
+    openDrawer: paymentMethod === 'cash',
+  });
 }
