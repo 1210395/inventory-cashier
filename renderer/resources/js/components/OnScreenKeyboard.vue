@@ -312,6 +312,7 @@ onBeforeUnmount(() => {
   width: 52px; height: 52px; border-radius: 50%;
   background: #D4A843; color: #1a1a1a; border: none; font-size: 24px;
   box-shadow: 0 4px 14px rgba(0,0,0,.35); cursor: pointer;
+  touch-action: manipulation;
 }
 .osk {
   background: #1f2937; padding: 8px; box-shadow: 0 -6px 20px rgba(0,0,0,.4);
@@ -320,6 +321,11 @@ onBeforeUnmount(() => {
      otherwise the flex rows reverse and the keys no longer follow the
      US QWERTY / Arabic 101 layout. */
   direction: ltr;
+  /* Consume all touch gestures on the keyboard surface. Without this the
+     browser treats each tap as a possible scroll, adds a disambiguation delay,
+     and can cancel the key's pointer sequence — letting the tap fall through to
+     whatever sits under the keyboard (e.g. the sidebar). */
+  touch-action: none;
 }
 /* Docked: full-width bar at the bottom */
 .osk-docked { position: fixed; left: 0; right: 0; bottom: 0; }
@@ -334,12 +340,14 @@ onBeforeUnmount(() => {
 .osk-tab {
   min-width: 44px; height: 40px; border-radius: 8px; border: none;
   background: #374151; color: #e5e7eb; font-size: 16px; font-weight: 600; cursor: pointer;
+  touch-action: none;
 }
 .osk-tab.on { background: #D4A843; color: #1a1a1a; }
-.osk-row { display: flex; gap: 6px; justify-content: center; margin-bottom: 6px; }
+.osk-row { display: flex; gap: 6px; justify-content: center; margin-bottom: 6px; touch-action: none; }
 .osk-key {
   flex: 1; max-width: 9%; height: var(--osk-k, 56px); border-radius: 8px; border: none;
   background: #374151; color: #fff; font-size: 20px; cursor: pointer;
+  touch-action: none;
 }
 .osk-key:active { background: #D4A843; color: #1a1a1a; }
 .osk-key.on { background: #D4A843; color: #1a1a1a; }
