@@ -51,6 +51,14 @@ function createWindow() {
 
   // Open external links (if any) in the same kiosk window rather than a new one.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Receipt/label printing used to call window.open('', '_blank'), which lands
+    // here as about:blank. NEVER navigate the kiosk window to a blank/data/blob
+    // URL — that would wipe the whole app (looked like a crash) and the popup
+    // would be blocked ("Please allow pop-ups to print"). Printing is now done
+    // natively via the cashier:printHtml IPC, so just deny these quietly.
+    if (!url || url === 'about:blank' || url.startsWith('data:') || url.startsWith('blob:')) {
+      return { action: 'deny' };
+    }
     // Allow WhatsApp share / tel / mailto to leave to the OS; keep app navigation in-window.
     if (/^(https?:\/\/wa\.me|mailto:|tel:)/i.test(url)) return { action: 'allow' };
     mainWindow?.loadURL(url);
@@ -150,14 +158,70 @@ if (-not $ok) { throw "WritePrinter failed for '$printer'" }
   });
 }
 
+// Resolve which printer to drive: the one chosen in Settings, or — if none is
+// chosen — the Windows default printer, so a freshly-connected drawer/printer
+// works without the operator having to open the hidden Settings window first.
+async function resolvePrinterName(): Promise<string> {
+  const configured = (store.get('receiptPrinter') || '').trim();
+  if (configured) return configured;
+  try {
+    if (mainWindow) {
+      const printers = await mainWindow.webContents.getPrintersAsync();
+      const def = printers.find((p) => p.isDefault) || printers[0];
+      if (def) return def.name;
+    }
+  } catch { /* fall through */ }
+  return '';
+}
+
 // ---- IPC ----
 ipcMain.handle('cashier:openDrawer', async () => {
-  return rawPrintWindows(store.get('receiptPrinter'), DRAWER_KICK);
+  const printer = await resolvePrinterName();
+  return rawPrintWindows(printer, DRAWER_KICK);
 });
 
 // Print raw ESC/POS bytes (array of numbers) — optional, for full ESC/POS receipts.
 ipcMain.handle('cashier:rawPrint', async (_, bytes: number[]) => {
-  return rawPrintWindows(store.get('receiptPrinter'), Buffer.from(bytes));
+  const printer = await resolvePrinterName();
+  return rawPrintWindows(printer, Buffer.from(bytes));
+});
+
+// Silent HTML receipt/label printing. Renders the document in a hidden window
+// and prints it to the configured receipt printer (or the OS default) WITHOUT
+// any browser pop-up or print dialog — the kiosk operator never gets prompted.
+ipcMain.handle('cashier:printHtml', async (_, html: string) => {
+  return new Promise<{ success: boolean; error?: string }>((resolve) => {
+    let win: BrowserWindow | null = new BrowserWindow({
+      show: false,
+      webPreferences: { contextIsolation: true, nodeIntegration: false },
+    });
+    let settled = false;
+    const finish = (result: { success: boolean; error?: string }) => {
+      if (settled) return;
+      settled = true;
+      try { win?.close(); } catch { /* noop */ }
+      win = null;
+      resolve(result);
+    };
+    win.webContents.once('did-finish-load', async () => {
+      if (!win) return;
+      const deviceName = await resolvePrinterName();
+      const opts: any = { silent: true, printBackground: true, margins: { marginType: 'none' } };
+      if (deviceName) opts.deviceName = deviceName;
+      try {
+        win.webContents.print(opts, (success, failureReason) => {
+          finish({ success, error: success ? undefined : (failureReason || 'Printing failed') });
+        });
+      } catch (e: any) {
+        finish({ success: false, error: e?.message || String(e) });
+      }
+    });
+    win.webContents.once('did-fail-load', (_e, _code, desc) =>
+      finish({ success: false, error: desc || 'Failed to render document' }));
+    // Safety net so a stuck print never leaks a hidden window.
+    setTimeout(() => finish({ success: false, error: 'Print timed out' }), 20000);
+    win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  });
 });
 
 ipcMain.handle('cashier:listPrinters', async () => {

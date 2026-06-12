@@ -447,6 +447,9 @@
               <span class="text-green-600 dark:text-green-400">{{ formatCurrency(receiptData.paid - receiptData.total) }}</span>
             </div>
           </div>
+          <div v-if="drawerError" class="mx-auto max-w-xs mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+            {{ drawerError }}
+          </div>
         </div>
         <template #footer>
           <AppButton variant="secondary" @click="printReceipt">{{ t('print_receipt') }}</AppButton>
@@ -546,6 +549,7 @@ const paymentMethod = ref('cash');
 const paidAmount = ref(0);
 const completing = ref(false);
 const error = ref('');
+const drawerError = ref('');
 const showReceiptModal = ref(false);
 const receiptData = reactive({
   invoice_number: '',
@@ -789,6 +793,7 @@ async function completeSale() {
 
   completing.value = true;
   error.value = '';
+  drawerError.value = '';
 
   const invoiceNumber = generateInvoiceNumber();
 
@@ -875,7 +880,16 @@ async function completeSale() {
       try {
         let kick = true;
         try { const s = await window.cashier.getSettings(); if (s && s.openDrawerOnSale === false) kick = false; } catch (e) { /* default to kicking */ }
-        if (kick) window.cashier.openDrawer();
+        if (kick) {
+          // Surface a failed kick so the operator knows to pick the receipt
+          // printer in Settings (Ctrl+Shift+S) — previously this failed silently.
+          const r = await window.cashier.openDrawer();
+          if (r && r.success === false) {
+            drawerError.value = r.error
+              ? (t('drawer_failed') || 'Cash drawer did not open') + ': ' + r.error
+              : (t('drawer_failed_hint') || 'Cash drawer did not open. Pick the receipt printer in Settings (Ctrl+Shift+S).');
+          }
+        }
       } catch (e) { /* noop */ }
     }
   } catch (e) {
@@ -961,6 +975,7 @@ function printReceipt() {
 
 function closeReceipt() {
   showReceiptModal.value = false;
+  drawerError.value = '';
   // Reset POS
   cart.value = [];
   selectedCustomerUuid.value = '';

@@ -5,6 +5,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('cashier', {
   openDrawer: () => ipcRenderer.invoke('cashier:openDrawer'),
   rawPrint: (bytes: number[]) => ipcRenderer.invoke('cashier:rawPrint', bytes),
+  // Silent receipt/label printing — no browser pop-up, no print dialog.
+  printHtml: (html: string) => ipcRenderer.invoke('cashier:printHtml', html),
   listPrinters: () => ipcRenderer.invoke('cashier:listPrinters'),
   getSettings: () => ipcRenderer.invoke('cashier:getSettings'),
   saveSettings: (s: any) => ipcRenderer.invoke('cashier:saveSettings', s),

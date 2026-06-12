@@ -76,6 +76,16 @@
         {{ error }}
       </div>
 
+      <!-- Success -->
+      <div v-if="successMsg" class="mb-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4 text-sm font-medium text-green-700 dark:text-green-400">
+        {{ successMsg }}
+      </div>
+
+      <!-- Another register session still open (close it before opening a new one) -->
+      <div v-if="anotherOpenWarning && currentShift" class="mb-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 p-4 text-sm font-medium text-amber-800 dark:text-amber-300">
+        {{ t('another_shift_open_close_first') || 'Another register session is still open. Close it to reconcile the drawer before opening a new one.' }}
+      </div>
+
       <!-- Data Table -->
       <AppDataTable
         :columns="columns"
@@ -216,6 +226,8 @@ import AppModal from '../../components/base/AppModal.vue';
 const loading = ref(true);
 const saving = ref(false);
 const error = ref('');
+const successMsg = ref('');
+const anotherOpenWarning = ref(false);
 const shifts = ref([]);
 const currentShift = ref(null);
 
@@ -318,15 +330,29 @@ async function submitOpen() {
     return;
   }
   saving.value = true;
+  error.value = '';
   try {
     await api.post('/cash-shifts', {
       open_amount: Number(openForm.value.open_amount),
       notes: openForm.value.notes || null,
     });
     showOpenModal.value = false;
+    anotherOpenWarning.value = false;
     await refresh();
+    successMsg.value = t('shift_opened_ok') || 'Register opened.';
   } catch (err) {
-    error.value = err.response?.data?.message || 'Failed to open shift.';
+    if (err.response?.status === 422) {
+      // The backend rejects a 2nd open shift. This happens when a register is
+      // still open elsewhere (e.g. synced from the mobile app / another day).
+      // Surface it so the cashier closes it first instead of hitting a dead button.
+      showOpenModal.value = false;
+      await refresh();
+      anotherOpenWarning.value = !!currentShift.value;
+      error.value = err.response?.data?.message
+        || (t('shift_already_open') || 'A register is already open. Close it before opening a new one.');
+    } else {
+      openErrors.value = { open_amount: err.response?.data?.message || (t('failed_open_shift') || 'Failed to open shift.') };
+    }
   } finally {
     saving.value = false;
   }
@@ -338,6 +364,7 @@ async function submitClose() {
     return;
   }
   saving.value = true;
+  error.value = '';
   try {
     await api.post(`/cash-shifts/${currentShift.value.uuid}/close`, {
       close_amount: Number(closeForm.value.close_amount),
@@ -345,8 +372,18 @@ async function submitClose() {
     });
     showCloseModal.value = false;
     await refresh();
+    if (currentShift.value) {
+      // Another register session is still open (e.g. one synced from the mobile
+      // app or left open on a previous day). Tell the cashier to close it too so
+      // the drawer reconciles before opening a fresh one.
+      anotherOpenWarning.value = true;
+      successMsg.value = '';
+    } else {
+      anotherOpenWarning.value = false;
+      successMsg.value = t('shift_closed_ok') || 'Register closed. You can open a new one.';
+    }
   } catch (err) {
-    error.value = err.response?.data?.message || 'Failed to close shift.';
+    error.value = err.response?.data?.message || (t('failed_close_shift') || 'Failed to close shift.');
   } finally {
     saving.value = false;
   }
@@ -355,9 +392,16 @@ async function submitClose() {
 async function fetchCurrent() {
   try {
     const res = await api.get('/cash-shifts/current');
-    currentShift.value = res.data.data || res.data;
+    const shift = res.data?.data ?? res.data;
+    // Only a real, still-open shift counts. Anything else (empty body, an
+    // already-closed record, an unexpected shape) means "no open register" —
+    // otherwise the old `res.data.data || res.data` could store a truthy
+    // non-shift value and hide the Open button forever ("can't open after close").
+    currentShift.value = (shift && shift.uuid && !shift.closed_at) ? shift : null;
   } catch (err) {
-    if (err.response?.status === 404) currentShift.value = null;
+    // 404 = no open shift. On ANY failure, assume no open register so a
+    // transient hiccup never strands the cashier without an Open button.
+    currentShift.value = null;
   }
 }
 

@@ -10,7 +10,7 @@
         : 'text-gray-300 hover:bg-gray-700/60 hover:text-gray-100',
     ]"
   >
-    <span class="text-lg w-6 text-center" v-html="icon"></span>
+    <span class="w-6 flex items-center justify-center flex-shrink-0" v-html="icon"></span>
     <span v-show="!collapsed">{{ label }}</span>
   </router-link>
 </template>

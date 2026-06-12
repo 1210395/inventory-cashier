@@ -29,14 +29,14 @@ function nameBi(obj) {
   return esc(e || a || (obj && obj.name) || '-');
 }
 
-function openAndPrint(title, bodyHtml, widthCss) {
-  const w = window.open('', '_blank', 'width=420,height=640');
-  if (!w) {
-    alert('Please allow pop-ups to print.');
-    return;
-  }
-  w.document.open();
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"/>
+// Build the standalone print document. `autoPrint` injects the browser
+// self-print script; the native (Electron) path leaves it out because the main
+// process triggers the print silently.
+function buildDoc(title, bodyHtml, widthCss, autoPrint) {
+  const autoScript = autoPrint
+    ? '<script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close();},300);};<\/script>'
+    : '';
+  return `<!doctype html><html><head><meta charset="utf-8"/>
 <title>${esc(title)}</title>
 <style>
   * { box-sizing: border-box; }
@@ -55,9 +55,40 @@ function openAndPrint(title, bodyHtml, widthCss) {
   .hdr { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
   .biz { font-weight: bold; font-size: 16px; }
   @media print { body { padding: 0; } @page { margin: 8mm; } }
-</style></head><body>${bodyHtml}
-<script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close();},300);};<\/script>
-</body></html>`);
+</style></head><body>${bodyHtml}${autoScript}
+</body></html>`;
+}
+
+function openAndPrint(title, bodyHtml, widthCss) {
+  // In the Electron cashier kiosk, print silently to the configured receipt
+  // printer via the native bridge — no pop-up, no permission prompt, no risk of
+  // blanking the app. (Previously window.open('') was denied by the kiosk's
+  // window-open handler, which navigated the main window to about:blank and
+  // showed a "Please allow pop-ups" alert — i.e. the reported crash.)
+  const native = typeof window !== 'undefined'
+    && window.cashier && typeof window.cashier.printHtml === 'function';
+  if (native) {
+    const doc = buildDoc(title, bodyHtml, widthCss, false);
+    Promise.resolve(window.cashier.printHtml(doc))
+      .then((r) => {
+        if (r && r.success === false) {
+          alert(r.error
+            ? ('Print failed: ' + r.error)
+            : 'Print failed. Pick the receipt printer in Settings (Ctrl+Shift+S).');
+        }
+      })
+      .catch((e) => alert('Print failed: ' + (e && e.message ? e.message : e)));
+    return;
+  }
+
+  // Plain web browser: open a print window (requires pop-ups to be allowed).
+  const w = window.open('', '_blank', 'width=420,height=640');
+  if (!w) {
+    alert('Please allow pop-ups to print.');
+    return;
+  }
+  w.document.open();
+  w.document.write(buildDoc(title, bodyHtml, widthCss, true));
   w.document.close();
 }
 

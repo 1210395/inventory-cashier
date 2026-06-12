@@ -283,6 +283,16 @@ export default {
   expected: 'Expected',
   actual: 'Actual',
   difference: 'Difference',
+  // Cash register lifecycle
+  shift_already_open: 'A register is already open. Close it before opening a new one.',
+  another_shift_open_close_first: 'Another register session is still open. Close it to reconcile the drawer before opening a new one.',
+  shift_closed_ok: 'Register closed. You can open a new one.',
+  shift_opened_ok: 'Register opened.',
+  failed_open_shift: 'Failed to open the register.',
+  failed_close_shift: 'Failed to close the register.',
+  // Cash drawer
+  drawer_failed: 'Cash drawer did not open',
+  drawer_failed_hint: 'Cash drawer did not open. Pick the receipt printer in Settings (Ctrl+Shift+S).',
   // Settings
   appearance: 'Appearance',
   dark_mode: 'Dark Mode',
