@@ -213,6 +213,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { formatMoney } from '../../composables/currency.js';
 import api from '../../composables/useApi.js';
 import { t, locale } from '../../i18n/index.js';
@@ -223,6 +224,7 @@ import AppButton from '../../components/base/AppButton.vue';
 import AppInput from '../../components/base/AppInput.vue';
 import AppModal from '../../components/base/AppModal.vue';
 
+const route = useRoute();
 const loading = ref(true);
 const saving = ref(false);
 const error = ref('');
@@ -425,5 +427,12 @@ async function refresh() {
   await Promise.all([fetchCurrent(), fetchShifts()]);
 }
 
-onMounted(refresh);
+onMounted(async () => {
+  await refresh();
+  // When the POS bounced the cashier here because no register is open, pop the
+  // Open Register dialog straight away so they can start the shift immediately.
+  if (route.query.need_shift && !currentShift.value) {
+    openShiftModal();
+  }
+});
 </script>

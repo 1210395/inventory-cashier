@@ -186,27 +186,52 @@ ipcMain.handle('cashier:rawPrint', async (_, bytes: number[]) => {
   return rawPrintWindows(printer, Buffer.from(bytes));
 });
 
-// Silent HTML receipt/label printing. Renders the document in a hidden window
-// and prints it to the configured receipt printer (or the OS default) WITHOUT
-// any browser pop-up or print dialog — the kiosk operator never gets prompted.
+// Silent HTML receipt/label printing. Renders the document in an off-screen
+// window and prints it to the configured receipt printer (or the OS default)
+// WITHOUT any browser pop-up or print dialog — the kiosk operator is never
+// prompted.
+//
+// Two things matter to avoid BLANK paper:
+//   1. Load from a real temp .html file, not a `data:` URL — Chromium renders
+//      data: URLs inconsistently and the page often isn't painted at print time.
+//   2. The window must actually paint before print() is called. We show it
+//      off-screen (showInactive, far off the desktop, no taskbar/focus) and wait
+//      for `ready-to-show` + a short tick so a frame exists to print.
 ipcMain.handle('cashier:printHtml', async (_, html: string) => {
   return new Promise<{ success: boolean; error?: string }>((resolve) => {
-    let win: BrowserWindow | null = new BrowserWindow({
-      show: false,
-      webPreferences: { contextIsolation: true, nodeIntegration: false },
-    });
+    const tmpHtml = path.join(os.tmpdir(), `hisab-receipt-${Date.now()}.html`);
+    let win: BrowserWindow | null = null;
     let settled = false;
     const finish = (result: { success: boolean; error?: string }) => {
       if (settled) return;
       settled = true;
       try { win?.close(); } catch { /* noop */ }
       win = null;
+      try { fs.unlinkSync(tmpHtml); } catch { /* noop */ }
       resolve(result);
     };
-    win.webContents.once('did-finish-load', async () => {
+
+    try {
+      fs.writeFileSync(tmpHtml, html, 'utf8');
+    } catch (e: any) {
+      return resolve({ success: false, error: e?.message || String(e) });
+    }
+
+    win = new BrowserWindow({
+      show: false,
+      width: 420,
+      height: 700,
+      x: -32000,
+      y: -32000,
+      skipTaskbar: true,
+      focusable: false,
+      webPreferences: { contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
+    });
+
+    const doPrint = async () => {
       if (!win) return;
       const deviceName = await resolvePrinterName();
-      const opts: any = { silent: true, printBackground: true, margins: { marginType: 'none' } };
+      const opts: any = { silent: true, printBackground: true };
       if (deviceName) opts.deviceName = deviceName;
       try {
         win.webContents.print(opts, (success, failureReason) => {
@@ -215,12 +240,19 @@ ipcMain.handle('cashier:printHtml', async (_, html: string) => {
       } catch (e: any) {
         finish({ success: false, error: e?.message || String(e) });
       }
-    });
+    };
+
+    // ready-to-show fires once the first frame is painted — the safest moment to
+    // print a never-focused window. The short delay is belt-and-suspenders.
+    win.once('ready-to-show', () => { try { win?.showInactive(); } catch { /* noop */ } setTimeout(doPrint, 250); });
+    // Fallback in case ready-to-show is missed on some GPU/driver combos.
+    win.webContents.once('did-finish-load', () => { try { win?.showInactive(); } catch { /* noop */ } setTimeout(doPrint, 500); });
     win.webContents.once('did-fail-load', (_e, _code, desc) =>
-      finish({ success: false, error: desc || 'Failed to render document' }));
-    // Safety net so a stuck print never leaks a hidden window.
-    setTimeout(() => finish({ success: false, error: 'Print timed out' }), 20000);
-    win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+      finish({ success: false, error: desc || 'Failed to render receipt' }));
+    // Safety net so a stuck print never leaks a hidden window/temp file.
+    setTimeout(() => finish({ success: false, error: 'Print timed out' }), 25000);
+
+    win.loadFile(tmpHtml);
   });
 });
 
