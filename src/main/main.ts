@@ -341,6 +341,105 @@ ipcMain.handle('cashier:printHtml', async (_, payload: { html: string; options?:
   });
 });
 
+// Driver-independent thermal receipt printing: render the receipt HTML to an
+// image, convert it to an ESC/POS raster (GS v 0), and send it over the SAME
+// raw channel the cash drawer uses (which we know reaches the printer). This
+// avoids ALL driver page-size/positioning issues — the printer prints the
+// bitmap at the roll width, left-aligned, and cuts at the end. Arabic is fine
+// because it's an image.
+ipcMain.handle('cashier:printRaster', async (_, payload: { html: string; widthMm?: number }) => {
+  const html = payload?.html;
+  const widthMm = (payload?.widthMm && payload.widthMm > 0) ? payload.widthMm : 80;
+  // CSS layout width (≈ mm @96dpi) and target printer dot width (80mm rolls are
+  // 576 printable dots at 203dpi).
+  const cssWidth = Math.max(120, Math.round((widthMm * 96) / 25.4));
+  const dots = widthMm >= 80 ? 576 : Math.round(widthMm * 8 * 0.9);
+
+  return new Promise<{ success: boolean; error?: string }>((resolve) => {
+    if (!html) return resolve({ success: false, error: 'No content' });
+    const tmpHtml = path.join(os.tmpdir(), `hisab-rcpt-${Date.now()}.html`);
+    let win: BrowserWindow | null = null;
+    let settled = false;
+    let started = false;
+    const finish = (r: { success: boolean; error?: string }) => {
+      if (settled) return;
+      settled = true;
+      try { win?.close(); } catch { /* noop */ }
+      win = null;
+      try { fs.unlinkSync(tmpHtml); } catch { /* noop */ }
+      resolve(r);
+    };
+
+    try { fs.writeFileSync(tmpHtml, html, 'utf8'); } catch (e: any) { return resolve({ success: false, error: e?.message || String(e) }); }
+
+    win = new BrowserWindow({
+      show: false, width: cssWidth + 2, height: 400, x: -20000, y: -20000,
+      skipTaskbar: true, focusable: false,
+      webPreferences: { contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
+    });
+
+    const run = async () => {
+      if (started || !win) return;
+      started = true;
+      try {
+        const px = Number(await win.webContents.executeJavaScript('Math.ceil(document.body.scrollHeight)')) || 400;
+        logLine('raster: content height px', px, 'cssWidth', cssWidth, 'dots', dots);
+        win.setContentSize(cssWidth + 2, px);
+        // Show off-screen so the window paints a full frame before we capture it.
+        try { win.showInactive(); } catch { /* noop */ }
+        await new Promise((r) => setTimeout(r, 300));
+        let img = await win.webContents.capturePage();
+        let size = img.getSize();
+        if (!size.width || !size.height) { finish({ success: false, error: 'Captured empty image' }); return; }
+        img = img.resize({ width: dots }); // normalize to the printer's dot width
+        size = img.getSize();
+        const bmp = img.getBitmap(); // BGRA, length = w*h*4
+        const w = size.width, h = size.height;
+        const widthBytes = Math.ceil(w / 8);
+        logLine('raster: image', { w, h, widthBytes });
+
+        const bytes: number[] = [0x1b, 0x40]; // ESC @ (init)
+        const BAND = 128; // rows per GS v 0 command (printer RAM friendly)
+        for (let y0 = 0; y0 < h; y0 += BAND) {
+          const rows = Math.min(BAND, h - y0);
+          bytes.push(0x1d, 0x76, 0x30, 0x00, widthBytes & 0xff, (widthBytes >> 8) & 0xff, rows & 0xff, (rows >> 8) & 0xff);
+          for (let y = y0; y < y0 + rows; y++) {
+            for (let bx = 0; bx < widthBytes; bx++) {
+              let byte = 0;
+              for (let bit = 0; bit < 8; bit++) {
+                const x = bx * 8 + bit;
+                if (x < w) {
+                  const idx = (y * w + x) * 4;
+                  const b = bmp[idx], g = bmp[idx + 1], r = bmp[idx + 2], a = bmp[idx + 3];
+                  const lum = a < 128 ? 255 : (0.299 * r + 0.587 * g + 0.114 * b);
+                  if (lum < 160) byte |= (0x80 >> bit); // dark pixel -> black dot (MSB = leftmost)
+                }
+              }
+              bytes.push(byte);
+            }
+          }
+        }
+        bytes.push(0x0a, 0x0a, 0x0a, 0x0a); // feed clear of the cutter
+        bytes.push(0x1d, 0x56, 0x42, 0x00); // GS V 66 0 — feed & partial cut
+
+        const printer = await resolvePrinterName();
+        logLine('raster: sending', bytes.length, 'bytes to', printer || '(none)');
+        const r = await rawPrintWindows(printer, Buffer.from(bytes));
+        logLine('raster: result', r);
+        finish(r.success ? { success: true } : { success: false, error: r.error });
+      } catch (e: any) {
+        logLine('raster: error', e?.message || String(e));
+        finish({ success: false, error: e?.message || String(e) });
+      }
+    };
+
+    win.webContents.once('did-finish-load', () => setTimeout(run, 300));
+    win.webContents.once('did-fail-load', (_e, _c, d) => finish({ success: false, error: d || 'render failed' }));
+    setTimeout(() => { if (!settled) logLine('raster: TIMED OUT'); finish({ success: false, error: 'raster timed out' }); }, 30000);
+    win.loadFile(tmpHtml);
+  });
+});
+
 ipcMain.handle('cashier:listPrinters', async () => {
   try {
     if (!mainWindow) return [];

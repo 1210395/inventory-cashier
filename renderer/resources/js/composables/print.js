@@ -49,7 +49,7 @@ function buildDoc(title, bodyHtml, widthCss, autoPrint, widthMm) {
     ? `@page { size: ${widthMm}mm auto; margin: 0; }`
     : `@media print { body { padding: 0; } @page { margin: 8mm; } }`;
   const bodyWidth = thermal
-    ? `width: ${widthMm}mm; margin: 0; padding: 0 3mm 4mm; font-size: 12px;`
+    ? `width: ${widthMm}mm; margin: 0; padding: 0 3mm 4mm; font-size: 12px; background: #fff;`
     : `padding: 16px; ${widthCss}`;
   return `<!doctype html><html><head><meta charset="utf-8"/>
 <title>${esc(title)}</title>
@@ -76,24 +76,36 @@ function buildDoc(title, bodyHtml, widthCss, autoPrint, widthMm) {
 
 function openAndPrint(title, bodyHtml, widthCss, opts) {
   const widthMm = opts && typeof opts.widthMm === 'number' ? opts.widthMm : undefined;
-  // In the Electron cashier kiosk, print silently to the configured receipt
-  // printer via the native bridge — no pop-up, no permission prompt, no risk of
-  // blanking the app. (Previously window.open('') was denied by the kiosk's
-  // window-open handler, which navigated the main window to about:blank and
-  // showed a "Please allow pop-ups" alert — i.e. the reported crash.)
-  const native = typeof window !== 'undefined'
-    && window.cashier && typeof window.cashier.printHtml === 'function';
-  if (native) {
+  const cashier = (typeof window !== 'undefined') ? window.cashier : null;
+  const fail = (e) => alert('Print failed: ' + (e && e.message ? e.message : (e || '')));
+
+  // THERMAL receipts in the kiosk: render to an image and send as ESC/POS
+  // raster over the raw channel — driver-independent, so it can't be mangled by
+  // the printer driver's page handling or come out as TSPL/label garbage.
+  if (cashier && widthMm && typeof cashier.printRaster === 'function') {
     const doc = buildDoc(title, bodyHtml, widthCss, false, widthMm);
-    Promise.resolve(window.cashier.printHtml(doc, widthMm ? { widthMm } : undefined))
+    Promise.resolve(cashier.printRaster(doc, widthMm))
       .then((r) => {
         if (r && r.success === false) {
-          alert(r.error
-            ? ('Print failed: ' + r.error)
-            : 'Print failed. Pick the receipt printer in Settings (Ctrl+Shift+S).');
+          // Fall back to the driver print path if raster couldn't run.
+          if (typeof cashier.printHtml === 'function') {
+            return cashier.printHtml(doc, { widthMm }).then((r2) => {
+              if (r2 && r2.success === false) fail(r2.error || r.error);
+            });
+          }
+          fail(r.error);
         }
       })
-      .catch((e) => alert('Print failed: ' + (e && e.message ? e.message : e)));
+      .catch(fail);
+    return;
+  }
+
+  // A4 documents (invoices, labels) in the kiosk: print via the driver.
+  if (cashier && typeof cashier.printHtml === 'function') {
+    const doc = buildDoc(title, bodyHtml, widthCss, false, widthMm);
+    Promise.resolve(cashier.printHtml(doc, widthMm ? { widthMm } : undefined))
+      .then((r) => { if (r && r.success === false) fail(r.error); })
+      .catch(fail);
     return;
   }
 
