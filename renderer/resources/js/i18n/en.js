@@ -293,6 +293,12 @@ export default {
   // Cash drawer
   drawer_failed: 'Cash drawer did not open',
   drawer_failed_hint: 'Cash drawer did not open. Pick the receipt printer in Settings (Ctrl+Shift+S).',
+  // Pagination / receipt
+  previous: 'Prev',
+  next: 'Next',
+  page: 'page',
+  of: 'of',
+  cashier: 'Cashier',
   // Settings
   appearance: 'Appearance',
   dark_mode: 'Dark Mode',

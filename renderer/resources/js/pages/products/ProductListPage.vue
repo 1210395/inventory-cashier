@@ -77,13 +77,16 @@
       <!-- Data Table -->
       <AppDataTable
         :columns="columns"
-        :data="sortedProducts"
+        :data="pagedProducts"
         :loading="loading"
         :empty-message="t('no_data')"
       >
         <template #empty>
           <div class="text-center py-16">
-            <div class="text-6xl mb-4">&#x1F4E6;</div>
+            <svg class="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+              <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+              <path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
+            </svg>
             <h3 class="text-lg font-medium text-gray-500 dark:text-gray-400">{{ t('no_products_yet') || 'No products yet' }}</h3>
             <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">{{ t('add_first_product') || 'Add your first product to get started' }}</p>
             <AppButton variant="primary" class="mt-4" @click="$router.push('/products/new')">+ {{ t('add') }} {{ t('products') }}</AppButton>
@@ -188,6 +191,35 @@
         </template>
       </AppDataTable>
 
+      <!-- Pagination -->
+      <div v-if="!loading && sortedProducts.length" class="mt-4 flex items-center justify-between flex-wrap gap-3">
+        <div class="text-sm text-gray-500 dark:text-gray-400">
+          {{ (page - 1) * pageSize + 1 }}–{{ Math.min(page * pageSize, sortedProducts.length) }}
+          {{ t('of') || 'of' }} {{ sortedProducts.length }}
+        </div>
+        <div class="flex items-center gap-2">
+          <select
+            v-model.number="pageSize"
+            class="px-2 py-1.5 rounded-lg text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#D4A843]"
+          >
+            <option :value="25">25 / {{ t('page') || 'page' }}</option>
+            <option :value="50">50 / {{ t('page') || 'page' }}</option>
+            <option :value="100">100 / {{ t('page') || 'page' }}</option>
+          </select>
+          <button
+            class="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700"
+            :disabled="page <= 1"
+            @click="page = Math.max(1, page - 1)"
+          >{{ t('previous') || 'Prev' }}</button>
+          <span class="text-sm text-gray-600 dark:text-gray-300 min-w-[80px] text-center">{{ page }} / {{ totalPages }}</span>
+          <button
+            class="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700"
+            :disabled="page >= totalPages"
+            @click="page = Math.min(totalPages, page + 1)"
+          >{{ t('next') || 'Next' }}</button>
+        </div>
+      </div>
+
       <!-- Stock In Modal -->
       <AppModal :show="showStockInModal" :title="t('stock') + ' +'" size="sm" @close="showStockInModal = false">
         <div class="space-y-4">
@@ -248,7 +280,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { formatMoney } from '../../composables/currency.js';
 import { useRouter, useRoute } from 'vue-router';
 import api from '../../composables/useApi.js';
@@ -416,6 +448,19 @@ const sortedProducts = computed(() => {
   }
 });
 
+// --- Client-side pagination over the full (filtered + sorted) product set ---
+const page = ref(1);
+const pageSize = ref(25);
+const totalPages = computed(() => Math.max(1, Math.ceil(sortedProducts.value.length / pageSize.value)));
+const pagedProducts = computed(() => {
+  const start = (page.value - 1) * pageSize.value;
+  return sortedProducts.value.slice(start, start + pageSize.value);
+});
+// Any filter/search/sort change resets to the first page so results are visible.
+watch([search, selectedCategoryUuids, lowStockFilter, sortOption, pageSize], () => { page.value = 1; });
+// Keep the page in range if the list shrinks.
+watch(totalPages, (tp) => { if (page.value > tp) page.value = tp; });
+
 function isExpiringSoon(item) {
   if (!item.expiry_date) return false;
   const expiry = new Date(item.expiry_date);
@@ -481,17 +526,33 @@ async function submitStockIn() {
   }
 }
 
+// Fetch EVERY product by paging through the API (the backend paginates at 20),
+// otherwise category/search filters only see the first page and look "broken".
+async function fetchAllProducts() {
+  const all = [];
+  let p = 1;
+  let last = 1;
+  do {
+    const res = await api.get('/products', { params: { per_page: 200, page: p } });
+    const items = res.data?.data || res.data || [];
+    all.push(...items);
+    last = res.data?.meta?.last_page ?? res.data?.last_page ?? 1;
+    p += 1;
+  } while (p <= last && p <= 100); // hard stop at 20k products as a safety net
+  return all;
+}
+
 onMounted(async () => {
   // Check for low_stock query param
   if (route.query.low_stock === 'true') {
     lowStockFilter.value = true;
   }
   try {
-    const [prodRes, catRes] = await Promise.all([
-      api.get('/products'),
+    const [allProducts, catRes] = await Promise.all([
+      fetchAllProducts(),
       api.get('/categories', { params: { all: true } }),
     ]);
-    products.value = prodRes.data.data || prodRes.data;
+    products.value = allProducts;
     allCategories.value = catRes.data.data || catRes.data;
   } catch (e) {
     error.value = e.response?.data?.message || 'Failed to load products.';

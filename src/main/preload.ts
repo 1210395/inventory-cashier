@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('cashier', {
   // options.widthMm = roll width for thermal receipts (e.g. 80); omit for A4.
   printHtml: (html: string, options?: { widthMm?: number }) =>
     ipcRenderer.invoke('cashier:printHtml', { html, options: options || {} }),
+  // Append a diagnostic line to log.txt from the renderer.
+  log: (msg: string) => ipcRenderer.invoke('cashier:log', msg),
   listPrinters: () => ipcRenderer.invoke('cashier:listPrinters'),
   getSettings: () => ipcRenderer.invoke('cashier:getSettings'),
   saveSettings: (s: any) => ipcRenderer.invoke('cashier:saveSettings', s),

@@ -469,6 +469,7 @@ import { formatMoney } from '../../composables/currency.js';
 import api from '../../composables/useApi.js';
 import { t } from '../../i18n/index.js';
 import { useUiStore } from '../../stores/ui.js';
+import { useAuthStore } from '../../stores/auth.js';
 import AppLayout from '../../components/layout/AppLayout.vue';
 import AppButton from '../../components/base/AppButton.vue';
 import AppInput from '../../components/base/AppInput.vue';
@@ -478,6 +479,9 @@ import BarcodeScanner from '../../components/base/BarcodeScanner.vue';
 import { printReceipt as printReceiptDoc } from '../../composables/print.js';
 
 const uiStore = useUiStore();
+const authStore = useAuthStore();
+// Diagnostic logging to log.txt (no-op outside the Electron cashier shell).
+function clog(msg) { try { window.cashier && window.cashier.log && window.cashier.log(msg); } catch (e) { /* noop */ } }
 
 // State
 const posCategories = ref([]);
@@ -561,6 +565,9 @@ const receiptData = reactive({
   discount: 0,
   tax: 0,
   payment_method: 'cash',
+  customer_name: '',
+  cashier_name: '',
+  date: '',
 });
 
 // New customer state
@@ -872,7 +879,13 @@ async function completeSale() {
     receiptData.discount = cartDiscountAmount.value;
     receiptData.tax = taxAmount.value;
     receiptData.payment_method = paymentMethod.value;
+    receiptData.customer_name = selectedCustomerUuid.value
+      ? (customers.value.find((c) => c.uuid === selectedCustomerUuid.value)?.name || '')
+      : '';
+    receiptData.cashier_name = authStore.user?.name || '';
+    receiptData.date = new Date().toLocaleString();
     showReceiptModal.value = true;
+    clog(`sale complete: ${invoiceNumber} total=${cartTotal.value} paid=${paidAmount.value} method=${paymentMethod.value} items=${cart.value.length}`);
 
     // Cashier terminal: kick the cash drawer on cash sales (Electron only),
     // unless the operator turned "open drawer on sale" off in Settings.
@@ -880,17 +893,19 @@ async function completeSale() {
       try {
         let kick = true;
         try { const s = await window.cashier.getSettings(); if (s && s.openDrawerOnSale === false) kick = false; } catch (e) { /* default to kicking */ }
+        clog(`drawer: cash sale, openDrawerOnSale=${kick}`);
         if (kick) {
           // Surface a failed kick so the operator knows to pick the receipt
           // printer in Settings (Ctrl+Shift+S) — previously this failed silently.
           const r = await window.cashier.openDrawer();
+          clog(`drawer: kick returned ${JSON.stringify(r)}`);
           if (r && r.success === false) {
             drawerError.value = r.error
               ? (t('drawer_failed') || 'Cash drawer did not open') + ': ' + r.error
               : (t('drawer_failed_hint') || 'Cash drawer did not open. Pick the receipt printer in Settings (Ctrl+Shift+S).');
           }
         }
-      } catch (e) { /* noop */ }
+      } catch (e) { clog('drawer: kick threw ' + (e && e.message ? e.message : e)); }
     }
   } catch (e) {
     error.value = e.response?.data?.message || 'Failed to complete sale.';
@@ -958,6 +973,7 @@ async function saveNewCustomer() {
 }
 
 function printReceipt() {
+  clog(`print receipt clicked: ${receiptData.invoice_number}`);
   printReceiptDoc({
     lines: receiptData.lines,
     settings: uiStore.settings,
@@ -970,6 +986,12 @@ function printReceipt() {
       total: receiptData.total,
     },
     paymentMethod: receiptData.payment_method,
+    invoiceNumber: receiptData.invoice_number,
+    paid: receiptData.paid,
+    change: receiptData.paid - receiptData.total,
+    customerName: receiptData.customer_name,
+    cashierName: receiptData.cashier_name,
+    dateStr: receiptData.date,
   });
 }
 

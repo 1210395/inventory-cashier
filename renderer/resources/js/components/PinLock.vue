@@ -117,7 +117,8 @@ onMounted(() => {
 }
 .pin-overlay {
   position: fixed; inset: 0; z-index: 2147483600;
-  background: rgba(17,24,39,.97); display: flex; align-items: center; justify-content: center;
+  /* Fully opaque so the app underneath is never visible while locked. */
+  background: #0b1220; display: flex; align-items: center; justify-content: center;
 }
 .pin-card { width: 320px; max-width: 90vw; text-align: center; color: #fff; }
 .pin-title { font-size: 20px; font-weight: 600; margin-bottom: 18px; }

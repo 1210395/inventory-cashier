@@ -5,6 +5,33 @@ import fs from 'fs';
 import { execFile } from 'child_process';
 import Store from 'electron-store';
 
+// --- Diagnostic log -------------------------------------------------------
+// The app appends plain-text lines to log.txt so hardware issues (printing,
+// the cash drawer) can be diagnosed from a customer's machine. Open it with
+// Ctrl+Shift+L; it lives at %APPDATA%\Hisab Cashier\log.txt.
+let _logFile: string | null = null;
+function logFilePath(): string {
+  if (!_logFile) {
+    try { _logFile = path.join(app.getPath('userData'), 'log.txt'); }
+    catch { _logFile = path.join(os.tmpdir(), 'hisab-cashier-log.txt'); }
+  }
+  return _logFile;
+}
+function logLine(...parts: any[]) {
+  const msg = parts
+    .map((p) => (typeof p === 'string' ? p : (() => { try { return JSON.stringify(p); } catch { return String(p); } })()))
+    .join(' ');
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try { fs.appendFileSync(logFilePath(), line); } catch { /* noop */ }
+  try { console.log(line.trimEnd()); } catch { /* noop */ }
+}
+function trimLogIfBig() {
+  try {
+    const st = fs.statSync(logFilePath());
+    if (st.size > 512 * 1024) fs.writeFileSync(logFilePath(), fs.readFileSync(logFilePath(), 'utf8').slice(-256 * 1024));
+  } catch { /* noop */ }
+}
+
 type Settings = {
   webUrl: string;
   receiptPrinter: string;
@@ -88,9 +115,14 @@ function openSettingsWindow() {
 }
 
 app.whenReady().then(() => {
+  trimLogIfBig();
+  logLine('=== app start ===', 'version', app.getVersion(), 'packaged', app.isPackaged,
+    'platform', process.platform, 'arch', process.arch,
+    'receiptPrinter', store.get('receiptPrinter') || '(none)',
+    'openDrawerOnSale', store.get('openDrawerOnSale'), 'log', logFilePath());
   createWindow();
 
-  // Admin hotkeys (cashiers don't see chrome): settings, reload, quit, devtools.
+  // Admin hotkeys (cashiers don't see chrome): settings, reload, quit, devtools, log.
   globalShortcut.register('CommandOrControl+Shift+S', () => openSettingsWindow());
   globalShortcut.register('CommandOrControl+Shift+R', () => mainWindow?.reload());
   globalShortcut.register('CommandOrControl+Shift+Q', () => app.quit());
@@ -103,8 +135,13 @@ app.on('will-quit', () => globalShortcut.unregisterAll());
 
 // ---- Cash drawer / raw ESC/POS printing (Windows) ----
 
-// ESC p 0 25 250 — standard cash-drawer kick (pin 2).
-const DRAWER_KICK = Buffer.from([0x1b, 0x70, 0x00, 0x19, 0xfa]);
+// Cash-drawer kick: ESC p m t1 t2. Drawers wire the solenoid to either pin 2
+// (m=0) or pin 5 (m=1), so we pulse BOTH — the drawer opens regardless of how
+// it's wired, and the inactive pin is simply ignored.
+const DRAWER_KICK = Buffer.from([
+  0x1b, 0x70, 0x00, 0x19, 0xfa, // ESC p 0 25 250  (pin 2)
+  0x1b, 0x70, 0x01, 0x19, 0xfa, // ESC p 1 25 250  (pin 5)
+]);
 
 function rawPrintWindows(printerName: string, data: Buffer): Promise<{ success: boolean; error?: string }> {
   return new Promise((resolve) => {
@@ -149,8 +186,14 @@ if (-not $ok) { throw "WritePrinter failed for '$printer'" }
       execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tmpPs], (err, _stdout, stderr) => {
         try { fs.unlinkSync(tmpData); } catch {}
         try { fs.unlinkSync(tmpPs); } catch {}
-        if (err) resolve({ success: false, error: (stderr || err.message || '').trim() });
-        else resolve({ success: true });
+        if (err) {
+          const msg = (stderr || err.message || '').trim();
+          logLine('rawPrint: FAILED to', printerName, '-', msg);
+          resolve({ success: false, error: msg });
+        } else {
+          logLine('rawPrint: OK to', printerName, `(${data.length} bytes)`);
+          resolve({ success: true });
+        }
       });
     } catch (e: any) {
       resolve({ success: false, error: e.message });
@@ -163,22 +206,30 @@ if (-not $ok) { throw "WritePrinter failed for '$printer'" }
 // works without the operator having to open the hidden Settings window first.
 async function resolvePrinterName(): Promise<string> {
   const configured = (store.get('receiptPrinter') || '').trim();
-  if (configured) return configured;
+  if (configured) { logLine('printer: using configured', configured); return configured; }
   try {
     if (mainWindow) {
       const printers = await mainWindow.webContents.getPrintersAsync();
+      logLine('printer: none configured; available', printers.map((p) => ({ name: p.name, default: p.isDefault })));
       const def = printers.find((p) => p.isDefault) || printers[0];
-      if (def) return def.name;
+      if (def) { logLine('printer: falling back to', def.name); return def.name; }
     }
-  } catch { /* fall through */ }
+  } catch (e: any) { logLine('printer: resolve error', e?.message || String(e)); }
+  logLine('printer: NONE resolved — receipt/drawer will not work until one is picked in Settings');
   return '';
 }
 
 // ---- IPC ----
 ipcMain.handle('cashier:openDrawer', async () => {
   const printer = await resolvePrinterName();
-  return rawPrintWindows(printer, DRAWER_KICK);
+  logLine('drawer: kick requested; printer', printer || '(none)');
+  const r = await rawPrintWindows(printer, DRAWER_KICK);
+  logLine('drawer: kick result', r);
+  return r;
 });
+
+// Renderer-side diagnostic logging (POS actions, etc.).
+ipcMain.handle('cashier:log', (_, msg: string) => { logLine('[ui]', String(msg)); return { success: true }; });
 
 // Print raw ESC/POS bytes (array of numbers) — optional, for full ESC/POS receipts.
 ipcMain.handle('cashier:rawPrint', async (_, bytes: number[]) => {
@@ -194,9 +245,10 @@ ipcMain.handle('cashier:rawPrint', async (_, bytes: number[]) => {
 // Two things matter to avoid BLANK paper:
 //   1. Load from a real temp .html file, not a `data:` URL — Chromium renders
 //      data: URLs inconsistently and the page often isn't painted at print time.
-//   2. The window must actually paint before print() is called. We show it
-//      off-screen (showInactive, far off the desktop, no taskbar/focus) and wait
-//      for `ready-to-show` + a short tick so a frame exists to print.
+//   2. The window must actually paint before print() is called. A plain hidden
+//      window (show:false) DOES paint (paintWhenInitiallyHidden), so we keep it
+//      hidden and on-screen — NOT shown off-screen, because a fully off-screen
+//      window isn't composited and prints blank.
 ipcMain.handle('cashier:printHtml', async (_, payload: { html: string; options?: { widthMm?: number } } | string) => {
   // Accept either a raw HTML string (back-compat) or { html, options }.
   const html = typeof payload === 'string' ? payload : payload?.html;
@@ -229,18 +281,15 @@ ipcMain.handle('cashier:printHtml', async (_, payload: { html: string; options?:
 
     // Match the on-screen layout width to the print width so the measured
     // content height lines up with the printed roll.
-    const winWidth = widthMm ? Math.ceil((widthMm * 96) / 25.4) + 24 : 420;
+    const winWidth = widthMm ? Math.ceil((widthMm * 96) / 25.4) + 24 : 800;
     win = new BrowserWindow({
-      show: false,
+      show: false, // stays hidden but still paints; do NOT show it off-screen
       width: winWidth,
-      height: 800,
-      x: -32000,
-      y: -32000,
-      skipTaskbar: true,
-      focusable: false,
+      height: 1000,
       webPreferences: { contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
     });
 
+    logLine('print: start', { widthMm, htmlBytes: html.length });
     const doPrint = async () => {
       if (printing || !win) return; // guard: ready-to-show AND did-finish-load both fire
       printing = true;
@@ -248,33 +297,41 @@ ipcMain.handle('cashier:printHtml', async (_, payload: { html: string; options?:
       const opts: any = { silent: true, printBackground: true, margins: { marginType: 'none' } };
       if (deviceName) opts.deviceName = deviceName;
       if (widthMm) {
-        // Size the page to the content so the thermal printer cuts at the end
-        // of the receipt rather than feeding a full A4 page.
-        let heightMicrons = 300000; // ~300mm fallback
+        // Size the page to the content so the thermal printer cuts at the end of
+        // the receipt rather than feeding a full A4 page. If we can't measure,
+        // omit pageSize and let the printer use its own media — the receipt is
+        // laid out narrow + left-aligned so it stays visible either way.
         try {
           const px = Number(await win.webContents.executeJavaScript('Math.ceil(document.body.scrollHeight)'));
-          if (px > 0) heightMicrons = Math.round(px * (25400 / 96)) + 8000; // +~8mm tail so nothing is cut
-        } catch { /* use fallback height */ }
-        opts.pageSize = { width: Math.round(widthMm * 1000), height: Math.max(heightMicrons, 40000) };
+          logLine('print: measured content height (px)', px);
+          if (px > 0) {
+            const heightMicrons = Math.round(px * (25400 / 96)) + 12000; // +~12mm tail so nothing is cut
+            opts.pageSize = { width: Math.round(widthMm * 1000), height: Math.max(heightMicrons, 50000) };
+          }
+        } catch (e: any) { logLine('print: height measure failed, using printer default media', e?.message || String(e)); }
       }
+      logLine('print: dispatch', { deviceName: deviceName || '(default)', pageSize: opts.pageSize || '(printer default)' });
       try {
         win.webContents.print(opts, (success, failureReason) => {
+          logLine('print: result', { success, failureReason: failureReason || null });
           finish({ success, error: success ? undefined : (failureReason || 'Printing failed') });
         });
       } catch (e: any) {
+        logLine('print: threw', e?.message || String(e));
         finish({ success: false, error: e?.message || String(e) });
       }
     };
 
-    // ready-to-show fires once the first frame is painted — the safest moment to
-    // print a never-focused window. The short delay is belt-and-suspenders.
-    win.once('ready-to-show', () => { try { win?.showInactive(); } catch { /* noop */ } setTimeout(doPrint, 250); });
-    // Fallback in case ready-to-show is missed on some GPU/driver combos.
-    win.webContents.once('did-finish-load', () => { try { win?.showInactive(); } catch { /* noop */ } setTimeout(doPrint, 500); });
-    win.webContents.once('did-fail-load', (_e, _code, desc) =>
-      finish({ success: false, error: desc || 'Failed to render receipt' }));
+    // Print once the content has loaded and had a moment to paint. Both events
+    // can fire; the `printing` guard makes doPrint run only once.
+    win.webContents.once('did-finish-load', () => setTimeout(doPrint, 350));
+    win.once('ready-to-show', () => setTimeout(doPrint, 350));
+    win.webContents.once('did-fail-load', (_e, code, desc) => {
+      logLine('print: did-fail-load', code, desc);
+      finish({ success: false, error: desc || 'Failed to render receipt' });
+    });
     // Safety net so a stuck print never leaks a hidden window/temp file.
-    setTimeout(() => finish({ success: false, error: 'Print timed out' }), 25000);
+    setTimeout(() => { if (!settled) logLine('print: TIMED OUT'); finish({ success: false, error: 'Print timed out' }); }, 25000);
 
     win.loadFile(tmpHtml);
   });

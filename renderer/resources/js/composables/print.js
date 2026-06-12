@@ -183,32 +183,69 @@ export function printLabels({ products, fmt }) {
   openAndPrint('Labels', body, 'max-width: 800px; margin: 0 auto;');
 }
 
-// 80mm thermal receipt for POS sales (bilingual labels + product names).
-export function printReceipt({ lines, settings, fmt, totals, paymentMethod }) {
+// 80mm thermal receipt for POS sales — detailed, bilingual.
+export function printReceipt({
+  lines, settings, fmt, totals, paymentMethod,
+  invoiceNumber, paid, change, customerName, cashierName, dateStr,
+}) {
   const s = settings || {};
-  const rows = (lines || []).map((it) => `
+  const hr = '<div style="border-top:1px dashed #555;margin:6px 0;"></div>';
+  const itemCount = (lines || []).reduce((n, it) => n + (Number(it.quantity) || 0), 0);
+  const when = dateStr || new Date().toLocaleString();
+
+  // Itemized lines: name on its own row, then qty × unit = line total below.
+  const rows = (lines || []).map((it, i) => `
     <tr>
-      <td>${(it.name_en || it.name_ar) ? nameBi(it) : esc(it.name)}<div class="muted" style="font-size:11px;">${esc(it.quantity)} × ${esc(fmt(it.unit_price))}</div></td>
-      <td class="r">${esc(fmt(it.line_total))}</td>
+      <td colspan="2" style="padding-top:${i ? 4 : 0}px;font-weight:600;">${(it.name_en || it.name_ar) ? nameBi(it) : esc(it.name)}</td>
+    </tr>
+    <tr>
+      <td class="muted" style="font-size:11px;padding-bottom:2px;">${esc(it.quantity)} × ${esc(fmt(it.unit_price))}</td>
+      <td class="r" style="padding-bottom:2px;">${esc(fmt(it.line_total))}</td>
     </tr>`).join('');
+
+  // Meta rows (invoice #, date, cashier, customer) — only show what we have.
+  const metaRow = (label, val) => val
+    ? `<tr><td class="muted" style="font-size:11px;">${label}</td><td class="r" style="font-size:11px;">${esc(val)}</td></tr>`
+    : '';
+
   const body = `
-    <div style="text-align:center;margin-bottom:6px;">
-      <div class="biz">${esc(s.business_name || '')}</div>
+    <div style="text-align:center;margin-bottom:4px;">
+      <div class="biz" style="font-size:17px;">${esc(s.business_name || 'Hisab')}</div>
       ${s.business_phone ? `<div class="muted" style="font-size:11px;">${esc(s.business_phone)}</div>` : ''}
       ${s.business_address ? `<div class="muted" style="font-size:11px;">${esc(s.business_address)}</div>` : ''}
-      <div class="muted" style="font-size:11px;">${esc(new Date().toLocaleString())}</div>
+      ${s.tax_id ? `<div class="muted" style="font-size:11px;">${bi('tax_id', 'Tax ID')}: ${esc(s.tax_id)}</div>` : ''}
     </div>
+    ${hr}
+    <table class="totals" style="width:100%;">
+      ${metaRow(bi('invoice', 'Invoice'), invoiceNumber)}
+      ${metaRow(bi('date', 'Date'), when)}
+      ${metaRow(bi('cashier', 'Cashier'), cashierName)}
+      ${metaRow(bi('customer', 'Customer'), customerName)}
+    </table>
+    ${hr}
     <table>
+      <thead>
+        <tr>
+          <th>${bi('products', 'Item')}</th>
+          <th class="r">${bi('total', 'Total')}</th>
+        </tr>
+      </thead>
       <tbody>${rows}</tbody>
     </table>
+    ${hr}
     <table class="totals" style="width:100%;">
+      <tr><td>${bi('items', 'Items')}</td><td class="r">${esc(itemCount)}</td></tr>
       <tr><td>${bi('subtotal', 'Subtotal')}</td><td class="r">${esc(fmt(totals.subtotal))}</td></tr>
       ${totals.discount ? `<tr><td>${bi('discount', 'Discount')}</td><td class="r">-${esc(fmt(totals.discount))}</td></tr>` : ''}
       ${totals.tax ? `<tr><td>${bi('tax', 'Tax')}</td><td class="r">${esc(fmt(totals.tax))}</td></tr>` : ''}
       <tr class="grand"><td>${bi('total', 'Total')}</td><td class="r">${esc(fmt(totals.total))}</td></tr>
       ${paymentMethod ? `<tr><td>${bi('payment_method', 'Payment')}</td><td class="r">${bi(paymentMethod, paymentMethod)}</td></tr>` : ''}
+      ${(paid != null) ? `<tr><td>${bi('paid', 'Paid')}</td><td class="r">${esc(fmt(paid))}</td></tr>` : ''}
+      ${(change != null && change > 0) ? `<tr><td>${bi('change', 'Change')}</td><td class="r">${esc(fmt(change))}</td></tr>` : ''}
     </table>
-    <p style="text-align:center;font-size:12px;margin-top:10px;">${bi('thank_you', 'Thank you!')}</p>
+    ${hr}
+    <p style="text-align:center;font-size:13px;font-weight:600;margin:8px 0 2px;">${bi('thank_you', 'Thank you!')}</p>
+    <p class="muted" style="text-align:center;font-size:10px;margin:0;">${esc(when)}</p>
   `;
   // 80mm thermal roll (Rongta and most receipt printers). Pass widthMm so the
   // print page matches the paper and the whole receipt is visible.
