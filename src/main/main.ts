@@ -382,4 +382,7 @@ ipcMain.handle('cashier:toggleFullscreen', () => {
 ipcMain.handle('cashier:isFullscreen', () => ({ fullscreen: mainWindow?.isFullScreen() ?? false }));
 
 ipcMain.handle('cashier:reloadApp', () => { mainWindow?.loadFile(path.join(__dirname, '../renderer/index.html')); return { success: true }; });
+// Open the cashier settings window from the UI (touchscreen kiosks have no
+// keyboard, so the Ctrl+Shift+S shortcut isn't reachable).
+ipcMain.handle('cashier:openSettings', () => { openSettingsWindow(); return { success: true }; });
 ipcMain.handle('cashier:closeSettings', () => { settingsWindow?.close(); return { success: true }; });

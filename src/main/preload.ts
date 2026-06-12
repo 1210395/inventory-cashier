@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('cashier', {
   getSettings: () => ipcRenderer.invoke('cashier:getSettings'),
   saveSettings: (s: any) => ipcRenderer.invoke('cashier:saveSettings', s),
   reloadApp: () => ipcRenderer.invoke('cashier:reloadApp'),
+  // Open the cashier settings window (touch-accessible — no keyboard needed).
+  openSettings: () => ipcRenderer.invoke('cashier:openSettings'),
   // Durable storage for state that must survive relaunch (PIN, account, token).
   secureGetAll: () => ipcRenderer.invoke('cashier:secureGetAll'),
   secureSet: (key: string, value: string) => ipcRenderer.invoke('cashier:secureSet', { key, value }),

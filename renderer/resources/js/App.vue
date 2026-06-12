@@ -10,6 +10,17 @@
   >{{ isFs ? '🗗' : '⛶' }}</button>
   <button
     v-if="hasNative"
+    class="cashier-settings-fab"
+    @click="openSettings"
+    title="Cashier settings (printer, drawer, PIN)"
+  >
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  </button>
+  <button
+    v-if="hasNative"
     class="cashier-drawer-fab"
     @click="openDrawer"
     title="Open cash drawer"
@@ -60,6 +71,10 @@ async function toggleFullscreen() {
   try { const r = await window.cashier?.toggleFullscreen(); isFs.value = !!r?.fullscreen; } catch { /* noop */ }
 }
 
+async function openSettings() {
+  try { await window.cashier?.openSettings(); } catch { /* noop */ }
+}
+
 async function openDrawer() {
   try {
     const r = await window.cashier?.openDrawer();
@@ -79,6 +94,14 @@ async function openDrawer() {
   position: fixed; right: 12px; top: 12px; z-index: 2147483000;
   width: 44px; height: 44px; border-radius: 10px;
   background: rgba(31,41,55,.85); color: #fff; border: none; font-size: 20px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35); cursor: pointer;
+}
+/* Touch-accessible Settings (kiosks have no keyboard for Ctrl+Shift+S). */
+.cashier-settings-fab {
+  position: fixed; right: 12px; top: 66px; z-index: 2147483000;
+  width: 44px; height: 44px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(31,41,55,.85); color: #fff; border: none;
   box-shadow: 0 4px 14px rgba(0,0,0,.35); cursor: pointer;
 }
 </style>
