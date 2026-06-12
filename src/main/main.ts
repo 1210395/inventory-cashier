@@ -301,23 +301,20 @@ ipcMain.handle('cashier:printHtml', async (_, payload: { html: string; options?:
       if (printing || !win) return; // guard: ready-to-show AND did-finish-load both fire
       printing = true;
       const deviceName = await resolvePrinterName();
+      // Page size is owned by the document's CSS @page (roll width + auto
+      // height) and the printer's media — we deliberately DON'T pass a pageSize
+      // option, since forcing a second, pixel-computed size fought the driver
+      // and pushed content onto a tall blank page that clipped the totals.
       const opts: any = { silent: true, printBackground: true, margins: { marginType: 'none' } };
       if (deviceName) opts.deviceName = deviceName;
       if (widthMm) {
-        // Size the page to the content so the thermal printer cuts at the end of
-        // the receipt rather than feeding a full A4 page. If we can't measure,
-        // omit pageSize and let the printer use its own media — the receipt is
-        // laid out narrow + left-aligned so it stays visible either way.
+        // For diagnostics only — does not affect the page size.
         try {
           const px = Number(await win.webContents.executeJavaScript('Math.ceil(document.body.scrollHeight)'));
-          logLine('print: measured content height (px)', px);
-          if (px > 0) {
-            const heightMicrons = Math.round(px * (25400 / 96)) + 12000; // +~12mm tail so nothing is cut
-            opts.pageSize = { width: Math.round(widthMm * 1000), height: Math.max(heightMicrons, 50000) };
-          }
-        } catch (e: any) { logLine('print: height measure failed, using printer default media', e?.message || String(e)); }
+          logLine('print: measured content height (px)', px, '(CSS @page drives the actual size)');
+        } catch (e: any) { logLine('print: height measure failed', e?.message || String(e)); }
       }
-      logLine('print: dispatch', { deviceName: deviceName || '(default)', pageSize: opts.pageSize || '(printer default)' });
+      logLine('print: dispatch', { deviceName: deviceName || '(default)', widthMm: widthMm || null });
       try {
         win.webContents.print(opts, (success, failureReason) => {
           logLine('print: result', { success, failureReason: failureReason || null });

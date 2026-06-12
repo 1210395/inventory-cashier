@@ -39,15 +39,17 @@ function buildDoc(title, bodyHtml, widthCss, autoPrint, widthMm) {
     ? '<script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close();},300);};<\/script>'
     : '';
   const thermal = typeof widthMm === 'number' && widthMm > 0;
-  // Thermal: ONLY zero the CSS margins — the page DIMENSIONS come from the
-  // Electron print `pageSize` option (roll width + measured content height).
-  // Do NOT also set `@page { size }` here: when both are set they conflict and
-  // the driver offsets the content downward and clips the bottom.
+  // Thermal: declare the page as the roll width with AUTO height in CSS, and do
+  // NOT pass a print `pageSize` option (the main process omits it). One single
+  // source of truth for page size avoids the layout/output mismatch that pushed
+  // content down a tall blank page and clipped the totals. Content is laid out
+  // left-aligned at the roll width, so even if the driver's media is larger the
+  // receipt prints in the left band of the paper rather than being cut.
   const pageRule = thermal
-    ? `@page { margin: 0; }`
+    ? `@page { size: ${widthMm}mm auto; margin: 0; }`
     : `@media print { body { padding: 0; } @page { margin: 8mm; } }`;
   const bodyWidth = thermal
-    ? `width: ${widthMm}mm; margin: 0; padding: 0 3mm 2mm; font-size: 12px;`
+    ? `width: ${widthMm}mm; margin: 0; padding: 0 3mm 4mm; font-size: 12px;`
     : `padding: 16px; ${widthCss}`;
   return `<!doctype html><html><head><meta charset="utf-8"/>
 <title>${esc(title)}</title>
