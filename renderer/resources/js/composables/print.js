@@ -31,9 +31,6 @@ function nameBi(obj) {
 
 // Build the standalone print document. `autoPrint` injects the browser
 // self-print script; the native (Electron) path leaves it out because the main
-// process triggers the print silently.
-// Build the standalone print document. `autoPrint` injects the browser
-// self-print script; the native (Electron) path leaves it out because the main
 // process triggers the print silently. When `widthMm` is set the document is
 // laid out for a narrow thermal roll (e.g. 80mm Rongta) — full width, no
 // centering, tight margins — instead of a centered A4 page.
@@ -42,13 +39,15 @@ function buildDoc(title, bodyHtml, widthCss, autoPrint, widthMm) {
     ? '<script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close();},300);};<\/script>'
     : '';
   const thermal = typeof widthMm === 'number' && widthMm > 0;
-  // Thermal: page == roll width, body fills it, minimal side padding so text
-  // isn't clipped at the right edge. A4: original centered layout.
+  // Thermal: ONLY zero the CSS margins — the page DIMENSIONS come from the
+  // Electron print `pageSize` option (roll width + measured content height).
+  // Do NOT also set `@page { size }` here: when both are set they conflict and
+  // the driver offsets the content downward and clips the bottom.
   const pageRule = thermal
-    ? `@page { size: ${widthMm}mm auto; margin: 0; } body { padding: 2mm 3mm; }`
+    ? `@page { margin: 0; }`
     : `@media print { body { padding: 0; } @page { margin: 8mm; } }`;
   const bodyWidth = thermal
-    ? `width: ${widthMm}mm; margin: 0; padding: 2mm 3mm; font-size: 12px;`
+    ? `width: ${widthMm}mm; margin: 0; padding: 0 3mm 2mm; font-size: 12px;`
     : `padding: 16px; ${widthCss}`;
   return `<!doctype html><html><head><meta charset="utf-8"/>
 <title>${esc(title)}</title>
